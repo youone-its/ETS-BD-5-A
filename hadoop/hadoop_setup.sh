@@ -1,16 +1,8 @@
 #!/bin/bash
 
-#bikin direktori buat weatherpulse nya
-docker exec -it hadoop-namenode hdfs dfs -mkdir -p /data/weather/api
-docker exec -it hadoop-namenode hdfs dfs -mkdir -p /data/weather/rss
-docker exec -it hadoop-namenode hdfs dfs -mkdir -p /data/weather/hasil
+#bikin topic
+docker exec -it kafka-broker /opt/kafka/bin/kafka-topics.sh --create --topic weather-api --partitions 6 --replication-factor 1 --config retention.ms=86400000 --bootstrap-server localhost:9092
+docker exec -it kafka-broker /opt/kafka/bin/kafka-topics.sh --create --topic weather-rss --partitions 6 --replication-factor 1 --config retention.ms=86400000 --bootstrap-server localhost:9092
 
-#cek direktori
-docker exec -it hadoop-namenode hdfs dfs -ls -R /data/
-
-#cek datanode
-docker exec -it hadoop-namenode hdfs dfsadmin -report
-
-#cek yarn
-docker exec -it hadoop-namenode yarn node -list
-
+#cek topic yang dibikin
+/opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092
