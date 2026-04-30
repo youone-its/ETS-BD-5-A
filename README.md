@@ -2,7 +2,7 @@
 
 WeatherPulse is a real-time data pipeline designed to ingest, process, and store weather information from multiple sources. This project leverages **Apache Kafka** for reliable messaging and **Apache Hadoop (HDFS)** for persistent storage of large-scale weather datasets.
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -14,7 +14,7 @@ graph TD
     C -->|Store| H[HDFS - Namenode / Data/weather]
 ```
 
-## 🚀 Features
+## Features
 
 - **Real-time API Ingestion**: Monitors weather conditions (temperature, humidity, wind speed) for 6 major Indonesian cities (Jakarta, Surabaya, Semarang, Medan, Makassar, Denpasar).
 - **RSS Feed Integration**: Scrapes weather-related news from national news outlets.
@@ -22,20 +22,20 @@ graph TD
 - **Distributed Storage**: Automatically flushes ingested data into Hadoop HDFS for future analysis.
 - **Dockerized Infrastructure**: Complete setup using Docker Compose for easy deployment.
 
-## 📁 Repository Structure
+##  Repository Structure
 
 - `hadoop/`: Docker configuration and setup scripts for the Hadoop cluster (Namenode, Datanode, ResourceManager, NodeManager).
 - `kafka/`: Docker configuration for the Kafka broker and controller.
 - `main.ipynb`: Core Python logic containing producers, consumers, and data formatting.
 
-## 🛠️ Prerequisites
+##  Prerequisites
 
 - Docker & Docker Compose
 - Python 3.x
 - Jupyter Notebook
 - Python libraries: `kafka-python`, `requests`, `feedparser`
 
-## 🏁 Getting Started
+##  Getting Started
 
 ### 1. Launch Infrastructure
 
@@ -74,7 +74,7 @@ Open `main.ipynb` in your Jupyter environment and run the cells sequentially:
 2.  **Section 2 (Data Ingest)**: Starts threads to push data into Kafka.
 3.  **Section 3 (Data Store)**: Starts consumers to save data into HDFS.
 
-## 📊 Data Locations
+##  Data Locations
 
 - **HDFS API Data**: `/data/weather/api/`
 - **HDFS RSS Data**: `/data/weather/rss/`
