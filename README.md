@@ -79,5 +79,64 @@ Open `main.ipynb` in your Jupyter environment and run the cells sequentially:
 - **HDFS API Data**: `/data/weather/api/`
 - **HDFS RSS Data**: `/data/weather/rss/`
 
+
+# 5. DASHBOARD
+
+Dashboard ini bertujuan untuk membangun sistem data pipeline yang menggabungkan:
+- Data streaming (real-time) dari Kafka
+- Data batch hasil analisis Spark
+- Dashboard sederhana menggunakan Flask
+
+Output akhir berupa dashboard web yang menampilkan data historis dan data live.
+
+### Arsitektur Sistem
+
+Sistem terdiri dari beberapa komponen utama:
+
+1. Producer → Mengirim data ke Kafka
+2. Kafka → Message broker
+3. Consumer → Mengambil data dan menyimpan ke JSON
+4. Spark → Analisis data historis
+5. Flask Dashboard → Menampilkan data ke user
+
+### Cara Menjalankan Sistem
+
+Untuk menjalankan sistem ini secara keseluruhan, diperlukan beberapa terminal yang berjalan secara bersamaan.
+
+#### 1. Menjalankan Producer API (Data Cuaca)
+Buka terminal pertama dan jalankan:
+```python producer_api.py```
+
+Producer ini akan mengirim data cuaca ke Kafka secara real-time.
+
+#### 2. Menjalankan Producer RSS (Data Berita)
+Buka terminal kedua dan jalankan:
+```python producer_rss.py```
+
+Producer ini akan mengirim data berita terbaru ke Kafka.
+
+#### 3. Menjalankan Dashboard (Flask)
+Buka terminal ketiga dan jalankan:
+```python app.py```
+
+Kemudian buka browser dan akses:
+http://localhost:5000
+
+Dashboard akan menampilkan data historis dan data live.
+
+#### Hasil Akhir
+Setelah semua komponen berjalan:
+- Dashboard akan menampilkan data dari Spark (historis)
+- Data live akan terus diperbarui dari Kafka
+- Halaman akan auto-refresh setiap 30 detik
+
+<img width="1600" height="999" alt="WhatsApp Image 2026-05-07 at 00 16 41" src="https://github.com/user-attachments/assets/8ed83af3-42c4-45a3-9680-5e33d92807c5" />
+
+<img width="1600" height="999" alt="WhatsApp Image 2026-05-07 at 00 16 41 (1)" src="https://github.com/user-attachments/assets/61c773ec-fedf-4060-bd41-f143329b1f5e" />
+
+<img width="1600" height="999" alt="WhatsApp Image 2026-05-07 at 00 16 42" src="https://github.com/user-attachments/assets/34856749-9491-4f63-adc4-ecbf0cef7a93" />
+
+<img width="1600" height="999" alt="WhatsApp Image 2026-05-07 at 00 16 43" src="https://github.com/user-attachments/assets/cee2292c-77c7-4496-b22c-34389541a541" />
+
 ---
 *Created as part of the Big Data course (ETS-BD-5-A)*
