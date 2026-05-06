@@ -49,9 +49,7 @@ def run_producer():
         # Serialize data ke JSON
         value_serializer=lambda x: json.dumps(x).encode('utf-8'),
         # Key berdasarkan kode kota (JKT, SBY, dll)
-        key_serializer=lambda x: x.encode('utf-8'),
-        enable_idempotence=True,
-        acks='all'
+        key_serializer=lambda x: x.encode('utf-8')
     )
 
     print(f"Starting Producer for topic: {TOPIC_NAME}...")

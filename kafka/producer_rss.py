@@ -28,10 +28,9 @@ def run_rss_producer():
         bootstrap_servers=BOOTSTRAP_SERVERS,
         key_serializer=lambda k: k.encode("utf-8"),
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        enable_idempotence=True,
         acks="all"
     )
-
+    
     print(f"[RSS Producer] Dimulai untuk topic: {TOPIC_RSS}")
     
     try:

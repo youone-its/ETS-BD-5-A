@@ -1,0 +1,576 @@
+<!-- Balqis Sani Sabillah - 5027241002 -->
+ 
+<!DOCTYPE html>
+<html lang="id">
+    
+</html>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⛅ WeatherPulse - Dashboard Cuaca Real-time Indonesia</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <span class="logo">⛅</span>
+                <h1>WeatherPulse Dashboard</h1>
+                <span class="subtitle">Real-time Weather Monitoring - 6 Kota Besar Indonesia</span>
+            </div>
+            <div class="navbar-status">
+                <div class="status-indicator">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Menghubungkan...</span>
+                </div>
+                <span id="lastUpdate" class="last-update">Last update: --:--:--</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="container">
+        
+        <!-- ALERT SECTION: Extreme Weather Warning -->
+        <section id="extremeSection" class="extreme-section hidden">
+            <div class="section-header">
+                <h2>🚨 Peringatan Cuaca Ekstrem</h2>
+                <p class="subtitle">Kondisi cuaca berbahaya terdeteksi</p>
+            </div>
+            <div id="extremeContainer" class="extreme-container">
+                <!-- Filled by JS -->
+            </div>
+        </section>
+
+        <!-- PANEL 1: Current Weather Table -->
+        <section class="panel panel-weather">
+            <div class="section-header">
+                <h2>🌡️ Status Cuaca Kota-Kota</h2>
+                <p class="subtitle">Data suhu, kelembaban, dan kecepatan angin real-time</p>
+            </div>
+            <div class="table-responsive">
+                <table id="weatherTable" class="weather-table">
+                    <thead>
+                        <tr>
+                            <th>Kota</th>
+                            <th>Suhu</th>
+                            <th>Cuaca</th>
+                            <th>Kelembaban</th>
+                            <th>Kecepatan Angin</th>
+                            <th>Status</th>
+                            <th>Update</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weatherTableBody">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-footer">
+                <small>📡 Data diperbarui setiap 10 detik dari sensor real-time</small>
+            </div>
+        </section>
+
+        <!-- PANEL 2: Spark Analysis -->
+        <section class="panel panel-analysis">
+            <div class="section-header">
+                <h2>📊 Analisis Data Spark</h2>
+                <p class="subtitle">Statistik suhu, deteksi ekstrem, dan tren harian</p>
+            </div>
+
+            <!-- Analisis 1: Temperature Statistics -->
+            <div class="analysis-subsection">
+                <h3>1️⃣ Perbandingan Suhu Antar Kota</h3>
+                <div id="analysisTemp" class="analysis-table-container">
+                    <table class="analysis-table">
+                        <thead>
+                            <tr>
+                                <th>Kota</th>
+                                <th>Rata-rata</th>
+                                <th>Tertinggi</th>
+                                <th>Terendah</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tempBody">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Analisis 2: Extreme Events -->
+            <div class="analysis-subsection">
+                <h3>2️⃣ Deteksi Kejadian Cuaca Ekstrem</h3>
+                <div id="analysisExtreme" class="analysis-table-container">
+                    <table class="analysis-table">
+                        <thead>
+                            <tr>
+                                <th>Kota</th>
+                                <th>Jumlah Event Ekstrem</th>
+                                <th>Kategori</th>
+                            </tr>
+                        </thead>
+                        <tbody id="extremeBody">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Analisis 3: Hourly Trend -->
+            <div class="analysis-subsection">
+                <h3>3️⃣ Tren Suhu Per Jam (Pola Diurnal)</h3>
+                <div id="analysisTrend" class="trend-container">
+                    <canvas id="trendChart"></canvas>
+                    <div id="trendTable" class="trend-table"></div>
+                </div>
+            </div>
+
+            <div class="analysis-footer">
+                <small>🔄 Data diperbarui dari Spark jobs setiap X interval</small>
+            </div>
+        </section>
+
+        <!-- PANEL 3: Latest News -->
+        <section class="panel panel-news">
+            <div class="section-header">
+                <h2>📰 Berita Cuaca Terbaru</h2>
+                <p class="subtitle">Update terkini dari RSS feeds nasional</p>
+            </div>
+            <div id="newsContainer" class="news-container">
+                <!-- Filled by JS -->
+            </div>
+            <div class="news-footer">
+                <small>📡 RSS Feeds: Tempo.co, Kompas.com | Auto-update setiap 5 menit</small>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <p>&copy; 2026 WeatherPulse - Big Data Weather Pipeline | Topik 2: Monitor Cuaca 6 Kota Besar Indonesia</p>
+        <p>Data sources: Open-Meteo API | RSS Feeds (Tempo.co, Kompas.com) | Apache Kafka | Spark | HDFS</p>
+    </footer>
+
+    <!-- SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+        // ====================================================================
+        // CONFIGURATION
+        // ====================================================================
+        const CONFIG = {
+            refreshInterval: 10000,  // 10 seconds
+            apiBase: '/api',
+            timeFormat: {
+                locale: 'id-ID',
+                options: { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit' 
+                }
+            }
+        };
+
+        const CITY_ORDER = ['JKT', 'SBY', 'SMG', 'MDN', 'MKS', 'DPS'];
+
+        // ====================================================================
+        // STATE
+        // ====================================================================
+        let currentWeatherData = {};
+        let sparkResults = {};
+        let newsData = [];
+        let trendChart = null;
+        let isConnected = false;
+
+        // ====================================================================
+        // UTILITY FUNCTIONS
+        // ====================================================================
+
+        function updateLastUpdateTime() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = 
+                `Last update: ${now.toLocaleTimeString(...Object.values(CONFIG.timeFormat))}`;
+        }
+
+        function setConnectionStatus(connected) {
+            isConnected = connected;
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusDot.classList.remove('disconnected');
+                statusText.textContent = '🟢 Terhubung';
+            } else {
+                statusDot.classList.remove('connected');
+                statusDot.classList.add('disconnected');
+                statusText.textContent = '🔴 Terputus';
+            }
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp || timestamp === 'N/A') return 'N/A';
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString(...Object.values(CONFIG.timeFormat));
+        }
+
+        function getTemperatureBadge(temp) {
+            if (temp === null) return '<span class="badge badge-pending">Menunggu...</span>';
+            if (temp < 20) return `<span class="badge badge-cold">❄️ ${temp}°C</span>`;
+            if (temp < 25) return `<span class="badge badge-cool">🌤️ ${temp}°C</span>`;
+            if (temp < 30) return `<span class="badge badge-normal">☀️ ${temp}°C</span>`;
+            if (temp < 35) return `<span class="badge badge-warm">🔥 ${temp}°C</span>`;
+            return `<span class="badge badge-hot">🌡️ ${temp}°C</span>`;
+        }
+
+        function getStatusBadge(isExtreme) {
+            if (isExtreme === null) return '<span class="badge badge-unknown">?</span>';
+            return isExtreme ? 
+                '<span class="badge badge-danger">⚠️ EKSTREM</span>' :
+                '<span class="badge badge-success">✓ Aman</span>';
+        }
+
+        // ====================================================================
+        // API CALLS
+        // ====================================================================
+
+        async function fetchCurrentWeather() {
+            try {
+                const response = await fetch(`${CONFIG.apiBase}/current_weather`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                currentWeatherData = await response.json();
+                setConnectionStatus(true);
+                return true;
+            } catch (error) {
+                console.error('Error fetching weather:', error);
+                setConnectionStatus(false);
+                return false;
+            }
+        }
+
+        async function fetchExtremeWeather() {
+            try {
+                const response = await fetch(`${CONFIG.apiBase}/extreme_weather`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                updateExtremeSection(data);
+                return true;
+            } catch (error) {
+                console.error('Error fetching extreme weather:', error);
+                return false;
+            }
+        }
+
+        async function fetchSparkResults() {
+            try {
+                const response = await fetch(`${CONFIG.apiBase}/spark_results`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    sparkResults = data.data;
+                    updateAnalysisSection();
+                    return true;
+                }
+            } catch (error) {
+                console.error('Error fetching spark results:', error);
+            }
+            return false;
+        }
+
+        async function fetchLatestNews() {
+            try {
+                const response = await fetch(`${CONFIG.apiBase}/latest_news`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                newsData = data.news;
+                updateNewsSection();
+                return true;
+            } catch (error) {
+                console.error('Error fetching news:', error);
+                return false;
+            }
+        }
+
+        // ====================================================================
+        // UI UPDATE FUNCTIONS
+        // ====================================================================
+
+        function updateWeatherTable() {
+            const tbody = document.getElementById('weatherTableBody');
+            tbody.innerHTML = '';
+
+            CITY_ORDER.forEach(kode => {
+                const data = currentWeatherData[kode] || {};
+                const row = document.createElement('tr');
+                
+                if (data.is_extreme) {
+                    row.classList.add('row-extreme');
+                }
+
+                row.innerHTML = `
+                    <td class="city-name">${data.nama_kota || 'N/A'}</td>
+                    <td>${getTemperatureBadge(data.temperature)}</td>
+                    <td>${data.weather_desc || 'N/A'}</td>
+                    <td>
+                        ${data.humidity !== null ? 
+                            `<span class="humidity ${data.humidity > 90 ? 'high' : ''}">${data.humidity}%</span>` :
+                            'N/A'
+                        }
+                    </td>
+                    <td>
+                        ${data.wind_speed !== null ? 
+                            `<span class="wind ${data.wind_speed > 40 ? 'strong' : ''}">${data.wind_speed} km/h</span>` :
+                            'N/A'
+                        }
+                    </td>
+                    <td>${getStatusBadge(data.is_extreme)}</td>
+                    <td class="timestamp">${formatTimestamp(data.timestamp)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateExtremeSection() {
+            const container = document.getElementById('extremeContainer');
+            const section = document.getElementById('extremeSection');
+            
+            // Fetch extreme data
+            fetch(`${CONFIG.apiBase}/extreme_weather`)
+                .then(r => r.json())
+                .then(data => {
+                    const extreme = data.extreme_cities;
+                    
+                    if (extreme.length === 0) {
+                        section.classList.add('hidden');
+                        return;
+                    }
+                    
+                    section.classList.remove('hidden');
+                    container.innerHTML = '';
+                    
+                    extreme.forEach(city => {
+                        const card = document.createElement('div');
+                        card.className = `extreme-card extreme-${city.severity}`;
+                        
+                        card.innerHTML = `
+                            <div class="extreme-header">
+                                <span class="extreme-city">${city.nama}</span>
+                                <span class="severity-badge">${city.severity.toUpperCase()}</span>
+                            </div>
+                            <div class="extreme-data">
+                                <div>🌡️ Suhu: <strong>${city.temperature}°C</strong></div>
+                                <div>💧 Kelembaban: <strong>${city.humidity}%</strong></div>
+                                <div>💨 Angin: <strong>${city.wind_speed} km/h</strong></div>
+                            </div>
+                            <div class="extreme-reasons">
+                                ${city.reason.map(r => `<div class="reason">⚠️ ${r}</div>`).join('')}
+                            </div>
+                            <small>${formatTimestamp(city.timestamp)}</small>
+                        `;
+                        container.appendChild(card);
+                    });
+                });
+        }
+
+        function updateAnalysisSection() {
+            // Update Analisis 1: Temperature Statistics
+            if (sparkResults.suhu_kota) {
+                const tbody = document.getElementById('tempBody');
+                tbody.innerHTML = '';
+                
+                sparkResults.suhu_kota.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.nama_kota}</td>
+                        <td>${(row.suhu_avg || 0).toFixed(1)}°C</td>
+                        <td>${(row.suhu_tertinggi || 0).toFixed(1)}°C</td>
+                        <td>${(row.suhu_terendah || 0).toFixed(1)}°C</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // Update Analisis 2: Extreme Events
+            if (sparkResults.ekstrem) {
+                const tbody = document.getElementById('extremeBody');
+                tbody.innerHTML = '';
+                
+                sparkResults.ekstrem.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const category = row.jumlah_event_ekstrem > 5 ? 'Sangat Tinggi' : 
+                                   row.jumlah_event_ekstrem > 2 ? 'Tinggi' : 'Sedang';
+                    tr.innerHTML = `
+                        <td>${row.nama_kota}</td>
+                        <td><strong>${row.jumlah_event_ekstrem}</strong> event</td>
+                        <td>${category}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // Update Analisis 3: Hourly Trend
+            if (sparkResults.tren_jam) {
+                updateTrendChart(sparkResults.tren_jam);
+                updateTrendTable(sparkResults.tren_jam);
+            }
+        }
+
+        function updateTrendChart(trendData) {
+            const ctx = document.getElementById('trendChart');
+            if (!ctx) return;
+
+            const labels = trendData.map(d => `${d.jam}:00`);
+            const temps = trendData.map(d => d.suhu_avg);
+
+            if (trendChart) {
+                trendChart.data.labels = labels;
+                trendChart.data.datasets[0].data = temps;
+                trendChart.update();
+            } else {
+                trendChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Rata-rata Suhu Semua Kota (°C)',
+                            data: temps,
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#ff6b6b'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Pola Diurnal Suhu Harian'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Suhu (°C)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Jam'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function updateTrendTable(trendData) {
+            const container = document.getElementById('trendTable');
+            container.innerHTML = '<table class="trend-mini-table"><tr><th>Jam</th><th>Rata-rata Suhu</th></tr>';
+            
+            trendData.slice(0, 12).forEach(row => {
+                const temp = (row.suhu_avg || 0).toFixed(1);
+                container.innerHTML += `
+                    <tr>
+                        <td>${row.jam}:00</td>
+                        <td><strong>${temp}°C</strong></td>
+                    </tr>
+                `;
+            });
+            container.innerHTML += '</table>';
+        }
+
+        function updateNewsSection() {
+            const container = document.getElementById('newsContainer');
+            container.innerHTML = '';
+
+            if (newsData.length === 0) {
+                container.innerHTML = '<p class="no-data">📭 Belum ada berita terbaru</p>';
+                return;
+            }
+
+            newsData.slice(0, 10).forEach((article, idx) => {
+                const card = document.createElement('article');
+                card.className = 'news-card';
+                card.innerHTML = `
+                    <div class="news-index">#${idx + 1}</div>
+                    <div class="news-content">
+                        <h4 class="news-title">
+                            <a href="${article.link}" target="_blank" rel="noopener">
+                                ${article.judul}
+                            </a>
+                        </h4>
+                        <p class="news-summary">${article.ringkasan}</p>
+                        <div class="news-meta">
+                            <span class="news-source">📰 ${article.sumber}</span>
+                            <span class="news-time">${formatTimestamp(article.waktu_terbit)}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // ====================================================================
+        // AUTO-REFRESH LOGIC
+        // ====================================================================
+
+        async function refreshAllData() {
+            try {
+                await Promise.all([
+                    fetchCurrentWeather(),
+                    fetchExtremeWeather(),
+                    fetchSparkResults(),
+                    fetchLatestNews()
+                ]);
+                
+                updateWeatherTable();
+                updateLastUpdateTime();
+            } catch (error) {
+                console.error('Error in refresh cycle:', error);
+            }
+        }
+
+        // ====================================================================
+        // INITIALIZATION
+        // ====================================================================
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 WeatherPulse Dashboard initialized');
+            
+            // First load
+            await refreshAllData();
+            
+            // Auto-refresh every N seconds
+            setInterval(refreshAllData, CONFIG.refreshInterval);
+            
+            console.log(`✅ Auto-refresh enabled every ${CONFIG.refreshInterval / 1000}s`);
+        });
+
+        // Manual refresh on visibility change (mobile/tab switch)
+        document.addEventListener('visibilitychange', async () => {
+            if (!document.hidden) {
+                console.log('📍 Tab became visible, refreshing data...');
+                await refreshAllData();
+            }
+        });
+    </script>
+</body>
+</html>
