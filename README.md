@@ -79,6 +79,93 @@ Open `main.ipynb` in your Jupyter environment and run the cells sequentially:
 - **HDFS API Data**: `/data/weather/api/`
 - **HDFS RSS Data**: `/data/weather/rss/`
 
+# 3. Producer RSS & Consumer to HDFS
+
+Membuat:
+
+### 1. Producer RSS (producer_rss.py)
+Dimana producer ini bertugas mengambil data berita dari beberapa sumber RSS, kemudian mengirimkannya ke Kafka topic `weather-rss`.
+
+Fitur utama:
+- Mengambil data dari:
+  - Antara News (Warta Bumi)
+  - Mongabay Indonesia
+- Melakukan deduplikasi artikel agar tidak dikirim berulang
+- Menggunakan hashing URL sebagai key Kafka
+- Mengirim data setiap 5 menit (300 detik)
+
+Struktur data yang dikirim adalah:
+- judul
+- link
+- ringkasan
+- waktu terbit
+- sumber
+- timestamp
+
+
+### 2. Consumer to HDFS (consumer_to_hdfs.py)
+Consumer ini bertugas membaca data dari Kafka dan menyimpannya ke dalam HDFS.
+
+Fitur utama:
+- Mengonsumsi data dari 2 topic:
+  - weather-api
+  - weather-rss
+- Menggunakan threading untuk memproses data API dan RSS secara paralel
+- Menyimpan data sementara di buffer
+- Melakukan flush ke HDFS setiap 2 menit
+- Menggunakan Docker untuk mengakses container Hadoop
+
+Alur penyimpanan:
+1. Data dikumpulkan di buffer
+2. Disimpan sementara sebagai file JSON lokal
+3. Dipindahkan ke container Hadoop
+4. Disimpan ke HDFS
+
+Path penyimpanan:
+- API  → /data/weather/api
+- RSS  → /data/weather/rss
+
+## Cara Menjalankan (Producer RSS & Consumer HDFS)
+
+Setelah kafka dan Hadoop (Docker) berjalan lalu
+
+### 1. Menjalankan Producer RSS
+```python producer_rss.py```
+
+Producer akan:
+- Mengambil data RSS setiap 5 menit
+- Mengirim artikel ke Kafka topic `weather-rss`
+
+### 2. Menjalankan Consumer ke HDFS
+Diterminal lain:
+```python consumer_to_hdfs.py```
+
+Consumer akan:
+- Membaca data dari Kafka
+- Menyimpan data ke buffer
+- Mengirim data ke HDFS setiap 2 menit
+
+
+### 3. Hasil
+- Data berita masuk ke Kafka
+- Data tersimpan di HDFS dalam bentuk file JSON
+- File tersimpan berdasarkan timestamp
+
+#### Producer RSS Berjalan
+
+- Menampilkan proses polling RSS
+- Menampilkan jumlah artikel yang dikirim
+
+#### Consumer to HDFS Berjalan
+(Tampilkan screenshot terminal saat consumer_to_hdfs.py berjalan)
+- Menampilkan proses konsumsi data
+- Menampilkan status berhasil/gagal penyimpanan ke HDFS
+
+#### Data di HDFS
+(Tampilkan screenshot hasil di HDFS, misalnya menggunakan command:)
+hdfs dfs -ls /data/weather/rss
+
+- Menunjukkan file JSON berhasil tersimpan
 
 # 5. DASHBOARD
 
