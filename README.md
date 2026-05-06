@@ -125,7 +125,7 @@ Path penyimpanan:
 - API  → /data/weather/api
 - RSS  → /data/weather/rss
 
-## Cara Menjalankan (Producer RSS & Consumer HDFS)
+### Cara Menjalankan (Producer RSS & Consumer HDFS)
 
 Setelah kafka dan Hadoop (Docker) berjalan lalu
 
@@ -186,7 +186,7 @@ Sistem terdiri dari beberapa komponen utama:
 4. Spark → Analisis data historis
 5. Flask Dashboard → Menampilkan data ke user
 
-### Cara Menjalankan Sistem
+### Cara Menjalankan 
 
 Untuk menjalankan sistem ini secara keseluruhan, diperlukan beberapa terminal yang berjalan secara bersamaan.
 
