@@ -226,4 +226,15 @@ Setelah semua komponen berjalan:
 <img width="1600" height="999" alt="WhatsApp Image 2026-05-07 at 00 16 43" src="https://github.com/user-attachments/assets/cee2292c-77c7-4496-b22c-34389541a541" />
 
 ---
+
+## Simple Running Guide kafka & hdfs 
+
+```
+hdfs dfs -ls -R /data/weather/api
+```
+
+```
+docker exec -it kafka-broker bash
+```
+
 *Created as part of the Big Data course (ETS-BD-5-A)*
