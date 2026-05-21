@@ -19,10 +19,6 @@ TOPIC_NAME = "weather-api"
 POLLING_INTERVAL = 600 
 
 def get_weather_data(lat, lon):
-    """
-    [Ni’mah Fauziyyah Atok]: Mengambil data cuaca real-time dari Open-Meteo API.
-    Tanpa API Key sesuai petunjuk ETS.
-    """
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
@@ -40,10 +36,6 @@ def get_weather_data(lat, lon):
         return None
 
 def run_producer():
-    """
-    [Ni’mah Fauziyyah Atok]: Inisialisasi Kafka Producer dengan konfigurasi
-    Idempotence dan Acks='all' untuk menjamin pengiriman data.
-    """
     producer = KafkaProducer(
         bootstrap_servers=['localhost:9092'],
         # Serialize data ke JSON

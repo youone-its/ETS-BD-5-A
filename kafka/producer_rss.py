@@ -5,7 +5,6 @@ import feedparser
 from datetime import datetime
 from kafka import KafkaProducer
 
-# [Ni’mah Fauziyyah Atok]: Konfigurasi diambil dari source: 3
 BOOTSTRAP_SERVERS = ["localhost:9092"]
 TOPIC_RSS = "weather-rss"
 INTERVAL_RSS = 300  # 5 menit sesuai ketentuan ETS
@@ -19,11 +18,9 @@ RSS_URLS = [
 sudah_dikirim = set()
 
 def hash_url(url: str) -> str:
-    """[Ni’mah Fauziyyah Atok]: Membuat key unik dari URL artikel"""
     return hashlib.md5(url.encode()).hexdigest()[:8]
 
 def run_rss_producer():
-    """[Ni’mah Fauziyyah Atok]: Fungsi utama producer RSS"""
     producer = KafkaProducer(
         bootstrap_servers=BOOTSTRAP_SERVERS,
         key_serializer=lambda k: k.encode("utf-8"),
