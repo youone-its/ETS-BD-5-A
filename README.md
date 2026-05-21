@@ -112,7 +112,7 @@ Fitur utama:
   - weather-rss
 - Menggunakan threading untuk memproses data API dan RSS secara paralel
 - Menyimpan data sementara di buffer
-- Melakukan flush ke HDFS setiap 2 menit
+- Melakukan flush ke HDFS setiap 5 menit
 - Menggunakan Docker untuk mengakses container Hadoop
 
 Alur penyimpanan:
