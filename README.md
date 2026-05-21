@@ -1,7 +1,7 @@
 Author : Kelompok 5 Big Data (A)
 | NRP | Nama | Kontribusi |
 |-----|------|------------|
-|5027241027 | Yuan Banny | SetUp |
+|5027241027 | Yuan Banny | Ingest + HDFS |
 |5027241103 | Ni'mah Fauziyyah | Kafka |
 |5027241093 | Atha Tajuddin | PySpark |
 |5027241002 | Balqis Sani S | Dashboard |
