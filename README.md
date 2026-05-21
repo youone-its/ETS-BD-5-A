@@ -145,28 +145,26 @@ Consumer akan:
 - Menyimpan data ke buffer
 - Mengirim data ke HDFS setiap 2 menit
 
-
 ### 3. Hasil
 - Data berita masuk ke Kafka
 - Data tersimpan di HDFS dalam bentuk file JSON
 - File tersimpan berdasarkan timestamp
 
 #### Producer RSS Berjalan
-
+![alt text](assets/01producer_rss.png)
 - Menampilkan proses polling RSS
 - Menampilkan jumlah artikel yang dikirim
 
 #### Consumer to HDFS Berjalan
-(Tampilkan screenshot terminal saat consumer_to_hdfs.py berjalan)
+![alt text](assets/02consumer.png)
 - Menampilkan proses konsumsi data
 - Menampilkan status berhasil/gagal penyimpanan ke HDFS
 
 #### Data di HDFS
-(Tampilkan screenshot hasil di HDFS, misalnya menggunakan command:)
 hdfs dfs -ls /data/weather/rss
 
 - Menunjukkan file JSON berhasil tersimpan
-
+![alt text](assets/03isirss.png)
 # 5. DASHBOARD
 
 Dashboard ini bertujuan untuk membangun sistem data pipeline yang menggabungkan:
