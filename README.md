@@ -1,3 +1,12 @@
+Author : Kelompok 5 Big Data (A)
+| NRP | Nama | Kontribusi |
+|-----|------|------------|
+|5027241027 | Yuan Banny | SetUp |
+|5027241103 | Ni'mah Fauziyyah | Kafka |
+|5027241093 | Atha Tajuddin | PySpark |
+|5027241002 | Balqis Sani S | Dashboard |
+| 5027241004 | Mey Rosalina | Dashboard |
+
 # WeatherPulse - Big Data Weather Pipeline
 
 WeatherPulse is a real-time data pipeline designed to ingest, process, and store weather information from multiple sources. This project leverages **Apache Kafka** for reliable messaging and **Apache Hadoop (HDFS)** for persistent storage of large-scale weather datasets.
