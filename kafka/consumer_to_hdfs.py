@@ -13,7 +13,7 @@ TOPIC_RSS = "weather-rss"
 
 HDFS_API_PATH = "/data/weather/api"
 HDFS_RSS_PATH = "/data/weather/rss"
-FLUSH_INTERVAL = 120  # Simpan ke HDFS setiap 2 menit sesuai source: 3
+FLUSH_INTERVAL = 300  # Simpan ke HDFS setiap 5 menit (KPK dari RSS=5 menit & API=10 menit)
 
 # Buffer untuk menampung data sebelum di-flush ke HDFS
 buffer_api = []
