@@ -48,7 +48,7 @@ weather_api_bronze = sample_weather_api \
 
 weather_api_bronze = weather_api_bronze.dropDuplicates(["kode_kota", "timestamp"])
 
-weather_api_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
+weather_api_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
 print(f" Written {weather_api_bronze.count()} weather API records to Bronze")
 
 print("\n Creating sample RSS News data...")
@@ -75,7 +75,7 @@ news_bronze = sample_news \
 
 news_bronze = news_bronze.dropDuplicates(["judul", "sumber"])
 
-news_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
+news_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
 print(f" Written {news_bronze.count()} news records to Bronze")
 
 print("\n" + "="*70)

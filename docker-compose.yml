@@ -109,3 +109,139 @@ services:
     stdin_open: true
     tty: true
     command: /bin/bash
+
+  producer-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    image: etsbd-producer-api
+    container_name: producer-api
+    depends_on:
+      - kafka
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    command: python producer_api.py
+    networks:
+      - default
+
+  producer-rss:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    image: etsbd-producer-rss
+    container_name: producer-rss
+    depends_on:
+      - kafka
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    command: python producer_rss.py
+    networks:
+      - default
+
+  consumer-hdfs:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    image: etsbd-consumer-hdfs
+    container_name: consumer-hdfs
+    depends_on:
+      - kafka
+      - namenode
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    command: python consumer_to_hdfs.py
+    networks:
+      - default
+
+  medallion-bronze:
+    build:
+      context: ./medallion
+      dockerfile: Dockerfile
+    image: etsbd-spark-medallion
+    container_name: medallion-bronze
+    depends_on:
+      - namenode
+    volumes:
+      - ./medallion:/app
+      - ./medallion/lakehouse_data:/lakehouse
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - SPARK_LOCAL_IP=127.0.0.1
+      - PYTHONUNBUFFERED=1
+    command: python 01_bronze.py
+    networks:
+      - default
+
+  medallion-silver:
+    build:
+      context: ./medallion
+      dockerfile: Dockerfile
+    image: etsbd-spark-medallion
+    container_name: medallion-silver
+    depends_on:
+      - medallion-bronze
+    volumes:
+      - ./medallion:/app
+      - ./medallion/lakehouse_data:/lakehouse
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - SPARK_LOCAL_IP=127.0.0.1
+      - PYTHONUNBUFFERED=1
+    command: python 02_silver.py
+    networks:
+      - default
+
+  medallion-gold:
+    build:
+      context: ./medallion
+      dockerfile: Dockerfile
+    image: etsbd-spark-medallion
+    container_name: medallion-gold
+    depends_on:
+      - medallion-silver
+    volumes:
+      - ./medallion:/app
+      - ./medallion/lakehouse_data:/lakehouse
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - SPARK_LOCAL_IP=127.0.0.1
+      - PYTHONUNBUFFERED=1
+    command: python 03_gold.py
+    networks:
+      - default
+
+  spark-analysis:
+    build:
+      context: ./medallion
+      dockerfile: Dockerfile
+    image: etsbd-spark-medallion
+    container_name: spark-analysis
+    depends_on:
+      - medallion-gold
+    volumes:
+      - ./medallion:/app
+      - ./medallion/lakehouse_data:/lakehouse
+      - .:/workspace
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - SPARK_LOCAL_IP=127.0.0.1
+      - PYTHONUNBUFFERED=1
+    working_dir: /workspace
+    command: python spark_analysis.py
+    networks:
+      - default
