@@ -5,37 +5,6 @@ networks:
     driver: bridge
 
 services:
-  kafka:
-    build:
-      context: ./kafka
-      dockerfile: Dockerfile
-    image: etsbd-kafka
-    container_name: kafka-broker
-    ports:
-      - "9092:9092"
-    networks:
-      - weatherpulse
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    healthcheck:
-      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
-      interval: 5s
-      timeout: 10s
-      retries: 10
-      start_period: 30s
-
   namenode:
     build:
       context: ./hadoop
@@ -107,103 +76,6 @@ services:
     env_file:
       - ./hadoop/hadoop.env
     command: ["yarn", "nodemanager"]
-
-  dashboard:
-    build:
-      context: ./dashboard
-      dockerfile: Dockerfile
-    image: etsbd-dashboard
-    container_name: etsbd-dashboard
-    ports:
-      - "5000:5000"
-    networks:
-      - weatherpulse
-    depends_on:
-      kafka:
-        condition: service_healthy
-    volumes:
-      - ./dashboard/data:/app/data
-
-  spark:
-    build:
-      context: ./medallion
-      dockerfile: Dockerfile
-    image: etsbd-spark-medallion
-    container_name: spark-medallion
-    networks:
-      - weatherpulse
-    depends_on:
-      namenode:
-        condition: service_healthy
-    volumes:
-      - ./medallion:/app
-      - ./medallion/lakehouse_data:/lakehouse
-    environment:
-      - HDFS_HOST=namenode
-      - HDFS_PORT=8020
-      - SPARK_LOCAL_IP=127.0.0.1
-    stdin_open: true
-    tty: true
-    command: /bin/bash
-
-  producer-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.pipeline
-    image: etsbd-producer-api
-    container_name: producer-api
-    networks:
-      - weatherpulse
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      - BOOTSTRAP_SERVERS=kafka:9092
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - .:/app
-    command: python producer_api.py
-
-  producer-rss:
-    build:
-      context: .
-      dockerfile: Dockerfile.pipeline
-    image: etsbd-producer-rss
-    container_name: producer-rss
-    networks:
-      - weatherpulse
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      - BOOTSTRAP_SERVERS=kafka:9092
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - .:/app
-    command: python producer_rss.py
-
-  consumer-hdfs:
-    build:
-      context: .
-      dockerfile: Dockerfile.pipeline
-    image: etsbd-consumer-hdfs
-    container_name: consumer-hdfs
-    networks:
-      - weatherpulse
-    depends_on:
-      kafka:
-        condition: service_healthy
-      namenode:
-        condition: service_healthy
-    environment:
-      - BOOTSTRAP_SERVERS=kafka:9092
-      - HDFS_HOST=namenode
-      - HDFS_PORT=8020
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - .:/app
-      - ./data:/data
-    command: python consumer_to_hdfs.py
 
   medallion-bronze:
     build:
@@ -292,3 +164,21 @@ services:
       - PYTHONUNBUFFERED=1
     working_dir: /workspace
     command: python spark_analysis.py
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    image: etsbd-dashboard
+    container_name: etsbd-dashboard
+    ports:
+      - "5000:5000"
+    networks:
+      - weatherpulse
+    depends_on:
+      spark-analysis:
+        condition: service_completed_successfully
+    volumes:
+      - ./dashboard/data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
