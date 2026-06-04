@@ -71,7 +71,114 @@
             </div>
         </section>
 
-        <!-- PANEL 2: Spark Analysis -->
+        <!-- PANEL 2: Gold Layer Analytics (Medallion) -->
+        <section class="panel panel-gold-analytics">
+            <div class="section-header">
+                <h2>🥇 Gold Layer Analytics (Medallion Architecture)</h2>
+                <p class="subtitle">Time-series analysis, weather extremes, dan weather-news correlation dari Delta Lake</p>
+            </div>
+
+            <!-- Gold 1: Weather Time-Series Analytics -->
+            <div class="analysis-subsection">
+                <h3>⏱️ Weather Time-Series Analytics (per Kota)</h3>
+                <p class="subtitle">Trend analisis suhu dengan moving averages (3-jam), perubahan per jam, humidity & wind</p>
+                <div id="goldWeatherAnalyticsContainer" class="analysis-table-container">
+                    <table class="analysis-table">
+                        <thead>
+                            <tr>
+                                <th>Kota</th>
+                                <th>Suhu Saat Ini</th>
+                                <th>Perubahan 1 Jam</th>
+                                <th>Moving Avg 3-Jam</th>
+                                <th>Kelembaban</th>
+                                <th>Kecepatan Angin</th>
+                                <th>Waktu Pembacaan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="goldWeatherAnalyticsBody">
+                            <tr><td colspan="7" class="no-data">⏳ Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Gold 2: Weather Extremes Summary -->
+            <div class="analysis-subsection">
+                <h3>🌡️ Weather Extremes Summary (per Kota)</h3>
+                <p class="subtitle">Statistik temperature range, max/min/avg suhu, humidity maksimal, angin kencang</p>
+                <div id="goldWeatherExtremesContainer" class="analysis-table-container">
+                    <table class="analysis-table">
+                        <thead>
+                            <tr>
+                                <th>Kota</th>
+                                <th>Max Temp</th>
+                                <th>Min Temp</th>
+                                <th>Avg Temp</th>
+                                <th>Range</th>
+                                <th>Max Humidity</th>
+                                <th>Max Wind</th>
+                                <th>Reading Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="goldWeatherExtremesBody">
+                            <tr><td colspan="8" class="no-data">⏳ Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Gold 3: News Source Distribution -->
+            <div class="analysis-subsection">
+                <h3>📰 News Source Distribution (Gold Analytics)</h3>
+                <p class="subtitle">Jumlah artikel per sumber, artikel terbaru dari setiap channel</p>
+                <div id="goldNewsAnalyticsContainer" class="analysis-table-container">
+                    <table class="analysis-table">
+                        <thead>
+                            <tr>
+                                <th>Sumber</th>
+                                <th>Total Artikel</th>
+                                <th>Artikel Terbaru</th>
+                            </tr>
+                        </thead>
+                        <tbody id="goldNewsAnalyticsBody">
+                            <tr><td colspan="3" class="no-data">⏳ Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Gold 4: Weather-News Correlation -->
+            <div class="analysis-subsection">
+                <h3>🔗 Weather-News Correlation</h3>
+                <p class="subtitle">Analisis korelasi antara kondisi cuaca dengan volume berita - apakah cuaca ekstrem memicu lebih banyak berita?</p>
+                <div id="goldCorrelationContainer" class="correlation-container">
+                    <div id="correlationChart" class="chart-placeholder">
+                        <canvas id="correlationChartCanvas"></canvas>
+                    </div>
+                    <table class="correlation-table">
+                        <thead>
+                            <tr>
+                                <th>Jam</th>
+                                <th>Kota</th>
+                                <th>Avg Temp</th>
+                                <th>Max Humidity</th>
+                                <th>Max Wind</th>
+                                <th>News Count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="goldCorrelationBody">
+                            <tr><td colspan="6" class="no-data">⏳ Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="analysis-footer">
+                <small>🏆 Data dari Gold layer (medallion architecture) - Delta Lake format | Last updated: <span id="goldUpdateTime">--:--:--</span></small>
+            </div>
+        </section>
+
+        <!-- PANEL 3: Spark Analysis -->
         <section class="panel panel-analysis">
             <div class="section-header">
                 <h2>📊 Analisis Data Spark</h2>
@@ -183,6 +290,13 @@
         let trendChart = null;
         let isConnected = false;
 
+        // Gold layer state
+        let goldWeatherAnalytics = [];
+        let goldWeatherExtremes = [];
+        let goldNewsAnalytics = [];
+        let goldCorrelationData = [];
+        let correlationChart = null;
+
         // ====================================================================
         // UTILITY FUNCTIONS
         // ====================================================================
@@ -285,13 +399,85 @@
             try {
                 const response = await fetch(`${CONFIG.apiBase}/latest_news`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                
+
                 const data = await response.json();
                 newsData = data.news;
                 updateNewsSection();
                 return true;
             } catch (error) {
                 console.error('Error fetching news:', error);
+                return false;
+            }
+        }
+
+        // ====================================================================
+        // GOLD LAYER API CALLS
+        // ====================================================================
+
+        async function fetchGoldWeatherAnalytics() {
+            try {
+                const response = await fetch(`${CONFIG.apiBase}/gold/weather_analytics`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    goldWeatherAnalytics = data.data || [];
+                    updateGoldWeatherAnalyticsUI();
+                }
+                return true;
+            } catch (error) {
+                console.error('Error fetching gold weather analytics:', error);
+                return false;
+            }
+        }
+
+        async function fetchGoldWeatherExtremes() {
+            try {
+                const response = await fetch(`${CONFIG.apiBase}/gold/weather_extremes`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    goldWeatherExtremes = data.data || [];
+                    updateGoldWeatherExtremesUI();
+                }
+                return true;
+            } catch (error) {
+                console.error('Error fetching gold weather extremes:', error);
+                return false;
+            }
+        }
+
+        async function fetchGoldNewsAnalytics() {
+            try {
+                const response = await fetch(`${CONFIG.apiBase}/gold/news_analytics`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    goldNewsAnalytics = data.data || [];
+                    updateGoldNewsAnalyticsUI();
+                }
+                return true;
+            } catch (error) {
+                console.error('Error fetching gold news analytics:', error);
+                return false;
+            }
+        }
+
+        async function fetchGoldCorrelation() {
+            try {
+                const response = await fetch(`${CONFIG.apiBase}/gold/weather_news_correlation`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    goldCorrelationData = data.data || [];
+                    updateGoldCorrelationUI();
+                }
+                return true;
+            } catch (error) {
+                console.error('Error fetching gold correlation:', error);
                 return false;
             }
         }
@@ -497,6 +683,215 @@
             container.innerHTML += '</table>';
         }
 
+        // ====================================================================
+        // GOLD LAYER UI UPDATE FUNCTIONS
+        // ====================================================================
+
+        function updateGoldWeatherAnalyticsUI() {
+            const tbody = document.getElementById('goldWeatherAnalyticsBody');
+            tbody.innerHTML = '';
+
+            if (goldWeatherAnalytics.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="no-data">📭 No data available</td></tr>';
+                return;
+            }
+
+            goldWeatherAnalytics.forEach(row => {
+                const tr = document.createElement('tr');
+                const tempChange = row.temp_change_1h ? (row.temp_change_1h >= 0 ? '+' : '') + row.temp_change_1h.toFixed(1) : 'N/A';
+                const readingTime = row.reading_time ? new Date(row.reading_time).toLocaleTimeString('id-ID') : 'N/A';
+
+                tr.innerHTML = `
+                    <td><strong>${row.nama_kota || row.kode_kota}</strong></td>
+                    <td>${(row.temp_current || 0).toFixed(1)}°C</td>
+                    <td><span class="${row.temp_change_1h > 0 ? 'temp-up' : 'temp-down'}">${tempChange}°C</span></td>
+                    <td>${(row.temp_moving_avg_3h || 0).toFixed(1)}°C</td>
+                    <td>${(row.humidity || 0).toFixed(0)}%</td>
+                    <td>${(row.wind_speed || 0).toFixed(1)} km/h</td>
+                    <td><small>${readingTime}</small></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            updateGoldTime();
+        }
+
+        function updateGoldWeatherExtremesUI() {
+            const tbody = document.getElementById('goldWeatherExtremesBody');
+            tbody.innerHTML = '';
+
+            if (goldWeatherExtremes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="no-data">📭 No data available</td></tr>';
+                return;
+            }
+
+            goldWeatherExtremes.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${row.nama_kota || row.kode_kota}</strong></td>
+                    <td>${(row.max_temp || 0).toFixed(1)}°C</td>
+                    <td>${(row.min_temp || 0).toFixed(1)}°C</td>
+                    <td>${(row.avg_temp || 0).toFixed(1)}°C</td>
+                    <td class="temp-range"><strong>${(row.temp_range || 0).toFixed(1)}°C</strong></td>
+                    <td>${(row.max_humidity || 0).toFixed(0)}%</td>
+                    <td>${(row.max_wind || 0).toFixed(1)} km/h</td>
+                    <td>${row.reading_count || 0}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            updateGoldTime();
+        }
+
+        function updateGoldNewsAnalyticsUI() {
+            const tbody = document.getElementById('goldNewsAnalyticsBody');
+            tbody.innerHTML = '';
+
+            if (goldNewsAnalytics.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="no-data">📭 No data available</td></tr>';
+                return;
+            }
+
+            goldNewsAnalytics.forEach(row => {
+                const tr = document.createElement('tr');
+                const latestTime = row.latest_article ? new Date(row.latest_article).toLocaleString('id-ID') : 'N/A';
+
+                tr.innerHTML = `
+                    <td><strong>${row.sumber || 'Unknown'}</strong></td>
+                    <td>${row.article_count || 0} articles</td>
+                    <td><small>${latestTime}</small></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            updateGoldTime();
+        }
+
+        function updateGoldCorrelationUI() {
+            const tbody = document.getElementById('goldCorrelationBody');
+            tbody.innerHTML = '';
+
+            if (goldCorrelationData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">📭 No correlation data available</td></tr>';
+                return;
+            }
+
+            // Limit to first 24 rows (hourly data)
+            const limitedData = goldCorrelationData.slice(0, 24);
+            limitedData.forEach(row => {
+                const tr = document.createElement('tr');
+                const hourStr = row.hour_start ? new Date(row.hour_start).toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit'}) : 'N/A';
+
+                tr.innerHTML = `
+                    <td>${hourStr}</td>
+                    <td>${row.nama_kota || row.kode_kota || 'All'}</td>
+                    <td>${(row.avg_temp || 0).toFixed(1)}°C</td>
+                    <td>${(row.max_humidity || 0).toFixed(0)}%</td>
+                    <td>${(row.max_wind || 0).toFixed(1)} km/h</td>
+                    <td><strong>${row.news_count || 0}</strong></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Update correlation chart
+            updateCorrelationChart(limitedData);
+            updateGoldTime();
+        }
+
+        function updateCorrelationChart(data) {
+            if (!data || data.length === 0) return;
+
+            // Aggregate by hour
+            const hourlyData = {};
+            data.forEach(row => {
+                if (row.hour_start) {
+                    const hourStr = new Date(row.hour_start).toLocaleTimeString('id-ID', {hour: '2-digit'});
+                    if (!hourlyData[hourStr]) {
+                        hourlyData[hourStr] = {
+                            temp: 0,
+                            news: 0,
+                            count: 0
+                        };
+                    }
+                    hourlyData[hourStr].temp += (row.avg_temp || 0);
+                    hourlyData[hourStr].news += (row.news_count || 0);
+                    hourlyData[hourStr].count += 1;
+                }
+            });
+
+            const labels = Object.keys(hourlyData);
+            const temps = labels.map(h => (hourlyData[h].temp / hourlyData[h].count).toFixed(1));
+            const newsCount = labels.map(h => hourlyData[h].news);
+
+            const ctx = document.getElementById('correlationChartCanvas');
+            if (!ctx) return;
+
+            if (correlationChart) {
+                correlationChart.data.labels = labels;
+                correlationChart.data.datasets[0].data = temps;
+                correlationChart.data.datasets[1].data = newsCount;
+                correlationChart.update();
+            } else {
+                correlationChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Avg Temperature (°C)',
+                                data: temps,
+                                borderColor: '#ff6b6b',
+                                backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                                tension: 0.3,
+                                yAxisID: 'y',
+                                fill: false,
+                                pointRadius: 3
+                            },
+                            {
+                                label: 'News Count',
+                                data: newsCount,
+                                borderColor: '#4ecdc4',
+                                backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                                fill: false,
+                                pointRadius: 3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: true, position: 'top' },
+                            title: { display: true, text: 'Weather-News Correlation Over Time' }
+                        },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: { display: true, text: 'Temperature (°C)' }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: { display: true, text: 'News Count' },
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function updateGoldTime() {
+            document.getElementById('goldUpdateTime').textContent =
+                new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
         function updateNewsSection() {
             const container = document.getElementById('newsContainer');
             container.innerHTML = '';
@@ -538,9 +933,13 @@
                     fetchCurrentWeather(),
                     fetchExtremeWeather(),
                     fetchSparkResults(),
-                    fetchLatestNews()
+                    fetchLatestNews(),
+                    fetchGoldWeatherAnalytics(),
+                    fetchGoldWeatherExtremes(),
+                    fetchGoldNewsAnalytics(),
+                    fetchGoldCorrelation()
                 ]);
-                
+
                 updateWeatherTable();
                 updateLastUpdateTime();
             } catch (error) {

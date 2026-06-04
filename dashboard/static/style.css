@@ -749,6 +749,106 @@ body {
 }
 
 /* ========================================================================
+   GOLD LAYER ANALYTICS SECTION
+   ======================================================================== */
+
+.panel-gold-analytics {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.05) 0%, rgba(255, 152, 0, 0.05) 100%);
+    border: 2px solid rgba(255, 193, 7, 0.3);
+}
+
+.panel-gold-analytics .section-header h2 {
+    background: linear-gradient(135deg, #ffc107, #ff9800);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.panel-gold-analytics .analysis-subsection {
+    border-left: 4px solid #ffc107;
+    padding-left: 1.5rem;
+}
+
+.panel-gold-analytics .analysis-subsection h3 {
+    color: #ffc107;
+}
+
+/* Correlation chart styling */
+.correlation-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.correlation-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.correlation-table th,
+.correlation-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.correlation-table th {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+}
+
+.correlation-table tr:hover {
+    background: rgba(255, 193, 7, 0.05);
+}
+
+.chart-placeholder {
+    width: 100%;
+    min-height: 300px;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+/* Temperature change indicators */
+.temp-up {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+.temp-down {
+    color: #3498db;
+    font-weight: 600;
+}
+
+.temp-range {
+    color: #f39c12;
+}
+
+/* Analysis footer timestamp */
+.analysis-footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+}
+
+#goldUpdateTime {
+    color: #ffc107;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+}
+
+/* ========================================================================
    UTILITIES
    ======================================================================== */
 
