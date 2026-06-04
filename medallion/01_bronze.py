@@ -7,11 +7,11 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType, I
 
 spark = SparkSession.builder \
     .appName("medallion-bronze") \
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
     .getOrCreate()
 
-print("="*70)
 print(" BRONZE LAYER: Raw Data Ingestion from HDFS")
-print("="*70)
 
 HDFS_HOST = os.getenv("HDFS_HOST", "namenode")
 HDFS_PORT = os.getenv("HDFS_PORT", "8020")
@@ -24,9 +24,9 @@ HDFS_RSS_PATH = f"{HDFS_PATH}/data/weather/rss"
 LAKEHOUSE_PATH = "/lakehouse"
 BRONZE_PATH = f"{LAKEHOUSE_PATH}/bronze"
 
-# ============================================================================
+
 # Read Weather API data from HDFS (from consumer_to_hdfs)
-# ============================================================================
+
 print("\n Reading Weather API data from HDFS...")
 try:
     df_weather_api = spark.read.json(HDFS_API_PATH)
@@ -37,10 +37,10 @@ try:
             .withColumn("_source", lit("weather-api"))
 
         weather_api_bronze = weather_api_bronze.dropDuplicates(["kode_kota", "timestamp"])
-        weather_api_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
-        print(f" ✅ Written {weather_api_bronze.count()} weather API records to Bronze")
+        weather_api_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
+        print(f"Written {weather_api_bronze.count()} weather API records to Bronze")
     else:
-        print(" ⚠️  No data found in HDFS API path, creating sample data for testing...")
+        print("No data found in HDFS API path, creating sample data for testing...")
         # Fallback: Create sample data if HDFS is empty
         sample_weather_api = spark.createDataFrame([
             {
@@ -67,7 +67,7 @@ try:
             .withColumn("_ingested_at", current_timestamp()) \
             .withColumn("_source", lit("weather-api"))
 
-        weather_api_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
+        weather_api_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
         print(f" ✅ Created sample data: {weather_api_bronze.count()} records")
 
 except Exception as e:
@@ -80,7 +80,7 @@ except Exception as e:
     ], schema="kode_kota string, nama_kota string, temperature double, humidity int, wind_speed double, weather_code int, timestamp string")
 
     weather_api_bronze = sample_weather_api.withColumn("_ingested_at", current_timestamp()).withColumn("_source", lit("weather-api"))
-    weather_api_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
+    weather_api_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
     print(f" ✅ Fallback: {weather_api_bronze.count()} sample records")
 
 # ============================================================================
@@ -96,7 +96,7 @@ try:
             .withColumn("_source", lit("weather-rss"))
 
         news_bronze = news_bronze.dropDuplicates(["judul", "sumber"])
-        news_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
+        news_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
         print(f" ✅ Written {news_bronze.count()} news records to Bronze")
     else:
         print(" ⚠️  No data found in HDFS RSS path, creating sample data for testing...")
@@ -119,7 +119,7 @@ try:
         ], schema="judul string, link string, ringkasan string, sumber string, waktu_terbit string")
 
         news_bronze = sample_news.withColumn("_ingested_at", current_timestamp()).withColumn("_source", lit("weather-rss"))
-        news_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
+        news_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
         print(f" ✅ Created sample data: {news_bronze.count()} records")
 
 except Exception as e:
@@ -132,7 +132,7 @@ except Exception as e:
     ], schema="judul string, link string, ringkasan string, sumber string, waktu_terbit string")
 
     news_bronze = sample_news.withColumn("_ingested_at", current_timestamp()).withColumn("_source", lit("weather-rss"))
-    news_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
+    news_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
     print(f" ✅ Fallback: {news_bronze.count()} sample records")
 
 print("\n" + "="*70)

@@ -38,7 +38,7 @@ GOLD_PATH = f"{LAKEHOUSE_PATH}/gold"
 
 print("\n🌡️  Creating Weather Analytics Gold Table...")
 try:
-    df_weather = spark.read.format("parquet").load(f"{SILVER_PATH}/weather_api")
+    df_weather = spark.read.format("delta").load(f"{SILVER_PATH}/weather_api")
     
     # Window function untuk time-series analysis
     window_spec = WindowSpec.partitionBy("kode_kota").orderBy("timestamp")
@@ -75,8 +75,8 @@ try:
         .withColumn("temp_range", col("max_temp") - col("min_temp"))
     
     # Tulis weather analytics
-    weather_analytics.write.format("parquet").mode("overwrite").save(f"{GOLD_PATH}/weather_analytics")
-    extremes.write.format("parquet").mode("overwrite").save(f"{GOLD_PATH}/weather_extremes")
+    weather_analytics.write.format("delta").mode("overwrite").save(f"{GOLD_PATH}/weather_analytics")
+    extremes.write.format("delta").mode("overwrite").save(f"{GOLD_PATH}/weather_extremes")
     
     print(f"✅ Weather analytics: {weather_analytics.count()} records")
     print(f"✅ Extremes summary: {extremes.count()} kota")
@@ -90,7 +90,7 @@ except Exception as e:
 
 print("\n📰 Creating News Analytics Gold Table...")
 try:
-    df_news = spark.read.format("parquet").load(f"{SILVER_PATH}/weather_rss")
+    df_news = spark.read.format("delta").load(f"{SILVER_PATH}/weather_rss")
     
     # Analisis 1: News distribution by source
     news_by_source = df_news \
@@ -116,8 +116,8 @@ try:
         )
     
     # Tulis news analytics
-    news_by_source.write.format("parquet").mode("overwrite").save(f"{GOLD_PATH}/news_by_source")
-    recent_news.write.format("parquet").mode("overwrite").save(f"{GOLD_PATH}/recent_news")
+    news_by_source.write.format("delta").mode("overwrite").save(f"{GOLD_PATH}/news_by_source")
+    recent_news.write.format("delta").mode("overwrite").save(f"{GOLD_PATH}/recent_news")
     
     print(f"✅ News by source: {news_by_source.count()} sources")
     print(f"✅ Recent news (top 20): {recent_news.count()} articles")
@@ -131,8 +131,8 @@ except Exception as e:
 
 print("\n🔗 Creating Weather-News Correlation Gold Table...")
 try:
-    df_weather = spark.read.format("parquet").load(f"{SILVER_PATH}/weather_api")
-    df_news = spark.read.format("parquet").load(f"{SILVER_PATH}/weather_rss")
+    df_weather = spark.read.format("delta").load(f"{SILVER_PATH}/weather_api")
+    df_news = spark.read.format("delta").load(f"{SILVER_PATH}/weather_rss")
     
     # Join weather + news dalam time window (1 jam)
     weather_hour = df_weather \
@@ -154,7 +154,7 @@ try:
         news_hour, on="hour", how="left"
     ).fillna(0, subset=["news_count"])
     
-    correlation.write.format("parquet").mode("overwrite").save(f"{GOLD_PATH}/weather_news_correlation")
+    correlation.write.format("delta").mode("overwrite").save(f"{GOLD_PATH}/weather_news_correlation")
     print(f"✅ Weather-News correlation: {correlation.count()} records")
     
 except Exception as e:
