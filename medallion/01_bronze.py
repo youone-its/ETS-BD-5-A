@@ -1,13 +1,27 @@
+#TES12345
 import os
 import json
 from datetime import datetime
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, current_timestamp, from_json
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, IntegerType
+from delta import configure_spark_with_delta_pip
+from pyspark.sql import SparkSession
 
-spark = SparkSession.builder \
-    .appName("medallion-bronze") \
-    .getOrCreate()
+builder = (
+    SparkSession.builder
+    .appName("medallion-bronze")
+    .config(
+        "spark.sql.extensions",
+        "io.delta.sql.DeltaSparkSessionExtension"
+    )
+    .config(
+        "spark.sql.catalog.spark_catalog",
+        "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    )
+)
+
+spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
 print("="*70)
 print(" BRONZE LAYER: Raw Data Ingestion")
@@ -48,7 +62,7 @@ weather_api_bronze = sample_weather_api \
 
 weather_api_bronze = weather_api_bronze.dropDuplicates(["kode_kota", "timestamp"])
 
-weather_api_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
+weather_api_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_api")
 print(f" Written {weather_api_bronze.count()} weather API records to Bronze")
 
 print("\n Creating sample RSS News data...")
@@ -75,7 +89,7 @@ news_bronze = sample_news \
 
 news_bronze = news_bronze.dropDuplicates(["judul", "sumber"])
 
-news_bronze.write.format("parquet").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
+news_bronze.write.format("delta").mode("overwrite").save(f"{BRONZE_PATH}/weather_rss")
 print(f" Written {news_bronze.count()} news records to Bronze")
 
 print("\n" + "="*70)

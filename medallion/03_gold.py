@@ -1,3 +1,4 @@
+#tes123
 """
 GOLD LAYER: Business Analytics & Aggregations
 ==============================================
@@ -16,13 +17,23 @@ from pyspark.sql.functions import (
     rank, dense_rank, row_number, lead, lag, sum as spark_sum
 )
 from pyspark.sql.window import Window as WindowSpec
+from delta import configure_spark_with_delta_pip
+from pyspark.sql import SparkSession
 
-# Initialize Spark Session
-spark = SparkSession.builder \
-    .appName("medallion-gold") \
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-    .getOrCreate()
+builder = (
+    SparkSession.builder
+    .appName("medallion-bronze")
+    .config(
+        "spark.sql.extensions",
+        "io.delta.sql.DeltaSparkSessionExtension"
+    )
+    .config(
+        "spark.sql.catalog.spark_catalog",
+        "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    )
+)
+
+spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
 print("="*70)
 print("🥇 GOLD LAYER: Business Analytics & Aggregations")
@@ -48,7 +59,7 @@ try:
         .withColumn("temp_lag1", lag("temperature").over(window_spec)) \
         .withColumn("temp_change", col("temperature") - col("temp_lag1")) \
         .withColumn("temp_ma3", 
-            avg("temperature").over(window_spec.rangeBetween(-2*3600, 0))) \
+            avg("temperature").over(window_spec.rowsBetween(-2, 0))) \
         .select(
             col("kode_kota"),
             col("nama_kota"),

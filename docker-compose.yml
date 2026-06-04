@@ -87,9 +87,13 @@ services:
     image: etsbd-dashboard
     container_name: etsbd-dashboard
     ports:
-      - "5000:5000"
+      - "5001:5000"
     depends_on:
       - kafka
+    volumes:
+      - ./medallion/lakehouse_data:/lakehouse_data:ro
+    environment:
+      - GOLD_PATH=/lakehouse_data/gold
 
   spark:
     build:

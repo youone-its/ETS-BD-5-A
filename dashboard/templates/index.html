@@ -2,12 +2,213 @@
  
 <!DOCTYPE html>
 <html lang="id">
-    
-</html>
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>⛅ WeatherPulse - Dashboard Cuaca Real-time Indonesia</title>
+    <meta name="description" content="Dashboard monitoring cuaca real-time 6 kota besar Indonesia menggunakan Apache Kafka, Spark, HDFS, dan Delta Lake Medallion Architecture.">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* ── Gold Layer Styles ── */
+        .gold-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, #f6c90e 0%, #e8a000 100%);
+            color: #1a1200;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            box-shadow: 0 2px 8px rgba(246,201,14,0.4);
+        }
+        .json-badge {
+            background: linear-gradient(135deg, #6c757d, #495057);
+            color: #fff;
+        }
+        .source-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 0.82rem;
+            color: #aaa;
+        }
+
+        /* ── Gold Section ── */
+        .panel-gold {
+            border-top: 3px solid #f6c90e;
+        }
+        .panel-gold .section-header h2 {
+            color: #f6c90e;
+        }
+
+        .gold-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 16px;
+        }
+        @media (max-width: 800px) {
+            .gold-grid { grid-template-columns: 1fr; }
+        }
+
+        .gold-card {
+            background: rgba(246,201,14,0.05);
+            border: 1px solid rgba(246,201,14,0.2);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .gold-card h4 {
+            color: #f6c90e;
+            font-size: 0.88rem;
+            margin: 0 0 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ── Stat Cards (Weather Extremes) ── */
+        .stat-card-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .stat-city-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .stat-city-name {
+            font-weight: 600;
+            color: #e0e0e0;
+            min-width: 90px;
+        }
+        .stat-pills {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .stat-pill {
+            background: rgba(246,201,14,0.12);
+            border: 1px solid rgba(246,201,14,0.25);
+            color: #f6c90e;
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .stat-pill.danger {
+            background: rgba(255,80,80,0.12);
+            border-color: rgba(255,80,80,0.3);
+            color: #ff5050;
+        }
+
+        /* ── Correlation Table ── */
+        .corr-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+        .corr-table th {
+            color: #f6c90e;
+            padding: 6px 8px;
+            text-align: left;
+            border-bottom: 1px solid rgba(246,201,14,0.2);
+            font-weight: 600;
+        }
+        .corr-table td {
+            padding: 5px 8px;
+            color: #c0c0c0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .corr-table tr:hover td {
+            background: rgba(246,201,14,0.05);
+        }
+
+        /* ── Source Bar Chart ── */
+        .source-bar {
+            margin-bottom: 10px;
+        }
+        .source-bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: #c0c0c0;
+            margin-bottom: 4px;
+        }
+        .source-bar-track {
+            background: rgba(255,255,255,0.07);
+            border-radius: 6px;
+            height: 8px;
+            overflow: hidden;
+        }
+        .source-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f6c90e, #e8a000);
+            border-radius: 6px;
+            transition: width 0.6s ease;
+        }
+
+        /* ── Gold News ── */
+        .gold-news-item {
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .gold-news-item:last-child { border-bottom: none; }
+        .gold-news-title {
+            color: #e0e0e0;
+            font-size: 0.82rem;
+            font-weight: 500;
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+        .gold-news-title a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .gold-news-title a:hover { color: #f6c90e; }
+        .gold-news-meta {
+            font-size: 0.7rem;
+            color: #777;
+        }
+        .gold-news-rank {
+            display: inline-block;
+            width: 22px;
+            height: 22px;
+            line-height: 22px;
+            text-align: center;
+            background: rgba(246,201,14,0.15);
+            color: #f6c90e;
+            border-radius: 50%;
+            font-size: 0.68rem;
+            font-weight: 700;
+            margin-right: 6px;
+            flex-shrink: 0;
+        }
+
+        /* ── Unavailable state ── */
+        .gold-unavailable {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.82rem;
+        }
+        .gold-unavailable code {
+            background: rgba(255,255,255,0.08);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            color: #aaa;
+        }
+    </style>
 </head>
 <body>
     <!-- HEADER -->
@@ -71,11 +272,16 @@
             </div>
         </section>
 
-        <!-- PANEL 2: Spark Analysis -->
+        <!-- PANEL 2: Spark Analysis (now reads from Gold Layer) -->
         <section class="panel panel-analysis">
             <div class="section-header">
                 <h2>📊 Analisis Data Spark</h2>
                 <p class="subtitle">Statistik suhu, deteksi ekstrem, dan tren harian</p>
+            </div>
+
+            <div class="source-indicator">
+                <span id="dataSourceBadge" class="gold-badge">⏳ Memuat...</span>
+                <span id="dataSourceLabel">Sumber data analitik</span>
             </div>
 
             <!-- Analisis 1: Temperature Statistics -->
@@ -127,7 +333,7 @@
             </div>
 
             <div class="analysis-footer">
-                <small>🔄 Data diperbarui dari Spark jobs setiap X interval</small>
+                <small>🔄 Data dari Gold Delta Lake — diperbarui setiap pipeline medallion dijalankan</small>
             </div>
         </section>
 
@@ -145,12 +351,71 @@
             </div>
         </section>
 
+        <!-- PANEL 4: 🥇 Gold Layer Analytics (BARU) -->
+        <section class="panel panel-gold">
+            <div class="section-header">
+                <h2>🥇 Gold Layer Analytics</h2>
+                <p class="subtitle">Data langsung dari Delta Lake Gold tables — hasil pipeline Medallion Architecture</p>
+            </div>
+
+            <div id="goldUnavailableMsg" class="gold-unavailable hidden">
+                <p>⚠️ Gold tables belum tersedia.</p>
+                <p>Jalankan pipeline medallion terlebih dahulu:</p>
+                <code>docker exec spark-medallion python 03_gold.py</code>
+            </div>
+
+            <div id="goldContent">
+                <div class="gold-grid">
+
+                    <!-- Sub-panel A: Weather Extremes Stats -->
+                    <div class="gold-card" id="cardWeatherExtremes">
+                        <h4>🌡️ Statistik Cuaca Per Kota (Gold)</h4>
+                        <div id="goldWeatherExtremes" class="stat-card-row">
+                            <div class="gold-unavailable"><small>Memuat data Gold...</small></div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-panel B: News by Source Distribution -->
+                    <div class="gold-card" id="cardNewsBySource">
+                        <h4>📡 Distribusi Berita Per Sumber (Gold)</h4>
+                        <div id="goldNewsBySource">
+                            <div class="gold-unavailable"><small>Memuat data Gold...</small></div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-panel C: Weather-News Correlation (Enhanced) -->
+                    <div class="gold-card" id="cardCorrelation">
+                        <h4>🔗 Korelasi Cuaca × Berita — Enhanced Analysis</h4>
+                        <p style="font-size:0.72rem;color:#888;margin:0 0 10px 0">
+                            Cross-source join: berapa berita muncul bersamaan dengan kondisi cuaca tertentu per window 1 jam?
+                        </p>
+                        <div id="goldCorrelation">
+                            <div class="gold-unavailable"><small>Memuat data Gold...</small></div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-panel D: Recent News from Gold -->
+                    <div class="gold-card" id="cardRecentNews">
+                        <h4>📰 Berita Terbaru dari Gold Table</h4>
+                        <div id="goldRecentNews">
+                            <div class="gold-unavailable"><small>Memuat data Gold...</small></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="analysis-footer" style="margin-top:16px;">
+                <small>🥇 Gold Layer dibaca langsung dari Delta Lake parquet files · Bonus +5 tugas lakehouse</small>
+            </div>
+        </section>
+
     </main>
 
     <!-- FOOTER -->
     <footer class="footer">
         <p>&copy; 2026 WeatherPulse - Big Data Weather Pipeline | Topik 2: Monitor Cuaca 6 Kota Besar Indonesia</p>
-        <p>Data sources: Open-Meteo API | RSS Feeds (Tempo.co, Kompas.com) | Apache Kafka | Spark | HDFS</p>
+        <p>Data sources: Open-Meteo API | RSS Feeds (Tempo.co, Kompas.com) | Apache Kafka | Spark | HDFS | Delta Lake</p>
     </footer>
 
     <!-- SCRIPTS -->
@@ -161,6 +426,7 @@
         // ====================================================================
         const CONFIG = {
             refreshInterval: 10000,  // 10 seconds
+            goldRefreshInterval: 60000,  // 60 seconds (Gold layer doesn't change as fast)
             apiBase: '/api',
             timeFormat: {
                 locale: 'id-ID',
@@ -212,7 +478,7 @@
         function formatTimestamp(timestamp) {
             if (!timestamp || timestamp === 'N/A') return 'N/A';
             const date = new Date(timestamp);
-            return date.toLocaleTimeString(...Object.values(CONFIG.timeFormat));
+            return isNaN(date.getTime()) ? timestamp : date.toLocaleTimeString(...Object.values(CONFIG.timeFormat));
         }
 
         function getTemperatureBadge(temp) {
@@ -232,7 +498,7 @@
         }
 
         // ====================================================================
-        // API CALLS
+        // API CALLS — LIVE DATA
         // ====================================================================
 
         async function fetchCurrentWeather() {
@@ -273,6 +539,8 @@
                 if (data.status === 'success') {
                     sparkResults = data.data;
                     updateAnalysisSection();
+                    // Update source badge
+                    updateSourceBadge(data.source);
                     return true;
                 }
             } catch (error) {
@@ -297,8 +565,208 @@
         }
 
         // ====================================================================
-        // UI UPDATE FUNCTIONS
+        // API CALLS — GOLD LAYER
         // ====================================================================
+
+        async function fetchGoldWeatherExtremes() {
+            try {
+                const res = await fetch(`${CONFIG.apiBase}/gold/weather_extremes`);
+                const data = await res.json();
+                renderGoldWeatherExtremes(data);
+            } catch (e) {
+                console.error('Gold weather_extremes error:', e);
+                document.getElementById('goldWeatherExtremes').innerHTML =
+                    '<div class="gold-unavailable">❌ Gagal memuat data</div>';
+            }
+        }
+
+        async function fetchGoldNewsBySource() {
+            try {
+                const res = await fetch(`${CONFIG.apiBase}/gold/news_by_source`);
+                const data = await res.json();
+                renderGoldNewsBySource(data);
+            } catch (e) {
+                console.error('Gold news_by_source error:', e);
+                document.getElementById('goldNewsBySource').innerHTML =
+                    '<div class="gold-unavailable">❌ Gagal memuat data</div>';
+            }
+        }
+
+        async function fetchGoldRecentNews() {
+            try {
+                const res = await fetch(`${CONFIG.apiBase}/gold/recent_news`);
+                const data = await res.json();
+                renderGoldRecentNews(data);
+            } catch (e) {
+                console.error('Gold recent_news error:', e);
+                document.getElementById('goldRecentNews').innerHTML =
+                    '<div class="gold-unavailable">❌ Gagal memuat data</div>';
+            }
+        }
+
+        async function fetchGoldCorrelation() {
+            try {
+                const res = await fetch(`${CONFIG.apiBase}/gold/weather_news_correlation`);
+                const data = await res.json();
+                renderGoldCorrelation(data);
+            } catch (e) {
+                console.error('Gold correlation error:', e);
+                document.getElementById('goldCorrelation').innerHTML =
+                    '<div class="gold-unavailable">❌ Gagal memuat data</div>';
+            }
+        }
+
+        async function refreshGoldLayer() {
+            await Promise.all([
+                fetchGoldWeatherExtremes(),
+                fetchGoldNewsBySource(),
+                fetchGoldRecentNews(),
+                fetchGoldCorrelation()
+            ]);
+        }
+
+        // ====================================================================
+        // RENDER — GOLD LAYER
+        // ====================================================================
+
+        function renderGoldWeatherExtremes(data) {
+            const container = document.getElementById('goldWeatherExtremes');
+            if (data.status !== 'success' || !data.data || data.data.length === 0) {
+                container.innerHTML = `<div class="gold-unavailable">
+                    ⚠️ Tabel belum tersedia<br><code>python 03_gold.py</code>
+                </div>`;
+                return;
+            }
+            container.innerHTML = '';
+            data.data.forEach(row => {
+                const isHot = row.max_temp && row.max_temp > 35;
+                const div = document.createElement('div');
+                div.className = 'stat-city-card';
+                div.innerHTML = `
+                    <span class="stat-city-name">${row.nama_kota || row.kode_kota || 'N/A'}</span>
+                    <div class="stat-pills">
+                        <span class="stat-pill ${isHot ? 'danger' : ''}">
+                            🌡️ avg ${row.avg_temp != null ? Number(row.avg_temp).toFixed(1) : 'N/A'}°C
+                        </span>
+                        <span class="stat-pill">↑ ${row.max_temp != null ? Number(row.max_temp).toFixed(1) : 'N/A'}°C</span>
+                        <span class="stat-pill">↓ ${row.min_temp != null ? Number(row.min_temp).toFixed(1) : 'N/A'}°C</span>
+                        <span class="stat-pill">💧 ${row.max_humidity != null ? row.max_humidity : 'N/A'}%</span>
+                        <span class="stat-pill">💨 ${row.max_wind != null ? Number(row.max_wind).toFixed(1) : 'N/A'} km/h</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderGoldNewsBySource(data) {
+            const container = document.getElementById('goldNewsBySource');
+            if (data.status !== 'success' || !data.data || data.data.length === 0) {
+                container.innerHTML = `<div class="gold-unavailable">
+                    ⚠️ Tabel belum tersedia<br><code>python 03_gold.py</code>
+                </div>`;
+                return;
+            }
+            container.innerHTML = '';
+            const maxCount = Math.max(...data.data.map(r => r.article_count || 0), 1);
+            data.data.forEach(row => {
+                const pct = Math.round(((row.article_count || 0) / maxCount) * 100);
+                const div = document.createElement('div');
+                div.className = 'source-bar';
+                div.innerHTML = `
+                    <div class="source-bar-label">
+                        <span>📰 ${row.sumber || 'Unknown'}</span>
+                        <span><strong>${row.article_count || 0}</strong> artikel</span>
+                    </div>
+                    <div class="source-bar-track">
+                        <div class="source-bar-fill" style="width:${pct}%"></div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderGoldRecentNews(data) {
+            const container = document.getElementById('goldRecentNews');
+            if (data.status !== 'success' || !data.data || data.data.length === 0) {
+                container.innerHTML = `<div class="gold-unavailable">
+                    ⚠️ Tabel belum tersedia<br><code>python 03_gold.py</code>
+                </div>`;
+                return;
+            }
+            container.innerHTML = '';
+            data.data.slice(0, 8).forEach(row => {
+                const div = document.createElement('div');
+                div.className = 'gold-news-item';
+                const judul = row.judul || 'Judul tidak tersedia';
+                const sumber = row.sumber || 'N/A';
+                const waktu = row.waktu_terbit ? formatTimestamp(row.waktu_terbit) : '-';
+                const rank = row.news_rank || '';
+                div.innerHTML = `
+                    <div class="gold-news-title">
+                        <span class="gold-news-rank">${rank}</span>
+                        <a href="#" target="_blank">${judul}</a>
+                    </div>
+                    <div class="gold-news-meta">📰 ${sumber} · ${waktu}</div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderGoldCorrelation(data) {
+            const container = document.getElementById('goldCorrelation');
+            if (data.status !== 'success' || !data.data || data.data.length === 0) {
+                container.innerHTML = `<div class="gold-unavailable">
+                    ⚠️ Tabel belum tersedia<br><code>python 03_gold.py</code>
+                </div>`;
+                return;
+            }
+            // Table view
+            let html = `<table class="corr-table">
+                <thead><tr>
+                    <th>Kota</th>
+                    <th>Avg Suhu</th>
+                    <th>Max Humidity</th>
+                    <th>Max Angin</th>
+                    <th>Jumlah Berita</th>
+                </tr></thead><tbody>`;
+            
+            data.data.slice(0, 8).forEach(row => {
+                const newsBadge = (row.news_count || 0) > 3
+                    ? `<strong style="color:#f6c90e">${row.news_count}</strong>`
+                    : row.news_count || 0;
+                html += `<tr>
+                    <td>${row.nama_kota || row.kode_kota || 'N/A'}</td>
+                    <td>${row.avg_temp != null ? Number(row.avg_temp).toFixed(1) + '°C' : '-'}</td>
+                    <td>${row.max_humidity != null ? row.max_humidity + '%' : '-'}</td>
+                    <td>${row.max_wind != null ? Number(row.max_wind).toFixed(1) + ' km/h' : '-'}</td>
+                    <td>${newsBadge}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // ====================================================================
+        // UI UPDATE FUNCTIONS — LIVE DATA
+        // ====================================================================
+
+        function updateSourceBadge(source) {
+            const badge = document.getElementById('dataSourceBadge');
+            const label = document.getElementById('dataSourceLabel');
+            if (source === 'gold_delta_lake') {
+                badge.className = 'gold-badge';
+                badge.textContent = '🥇 Gold Delta Lake';
+                label.textContent = 'Data analitik dari Gold Delta Lake tables';
+            } else if (source === 'spark_results_json') {
+                badge.className = 'gold-badge json-badge';
+                badge.textContent = '📄 spark_results.json';
+                label.textContent = 'Data analitik dari file JSON (legacy ETS)';
+            } else {
+                badge.className = 'gold-badge json-badge';
+                badge.textContent = '⏳ Memuat...';
+                label.textContent = 'Memuat sumber data...';
+            }
+        }
 
         function updateWeatherTable() {
             const tbody = document.getElementById('weatherTableBody');
@@ -339,7 +807,6 @@
             const container = document.getElementById('extremeContainer');
             const section = document.getElementById('extremeSection');
             
-            // Fetch extreme data
             fetch(`${CONFIG.apiBase}/extreme_weather`)
                 .then(r => r.json())
                 .then(data => {
@@ -414,7 +881,7 @@
             }
 
             // Update Analisis 3: Hourly Trend
-            if (sparkResults.tren_jam) {
+            if (sparkResults.tren_jam && sparkResults.tren_jam.length > 0) {
                 updateTrendChart(sparkResults.tren_jam);
                 updateTrendTable(sparkResults.tren_jam);
             }
@@ -452,29 +919,15 @@
                         responsive: true,
                         maintainAspectRatio: true,
                         plugins: {
-                            legend: {
-                                display: true,
-                                position: 'top'
-                            },
-                            title: {
-                                display: true,
-                                text: 'Pola Diurnal Suhu Harian'
-                            }
+                            legend: { display: true, position: 'top' },
+                            title: { display: true, text: 'Pola Diurnal Suhu Harian' }
                         },
                         scales: {
                             y: {
                                 beginAtZero: false,
-                                title: {
-                                    display: true,
-                                    text: 'Suhu (°C)'
-                                }
+                                title: { display: true, text: 'Suhu (°C)' }
                             },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Jam'
-                                }
-                            }
+                            x: { title: { display: true, text: 'Jam' } }
                         }
                     }
                 });
@@ -555,13 +1008,15 @@
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('🚀 WeatherPulse Dashboard initialized');
             
-            // First load
+            // First load — live data
             await refreshAllData();
-            
-            // Auto-refresh every N seconds
             setInterval(refreshAllData, CONFIG.refreshInterval);
             
-            console.log(`✅ Auto-refresh enabled every ${CONFIG.refreshInterval / 1000}s`);
+            // First load — Gold Layer
+            await refreshGoldLayer();
+            setInterval(refreshGoldLayer, CONFIG.goldRefreshInterval);
+            
+            console.log(`✅ Auto-refresh: live=${CONFIG.refreshInterval/1000}s, gold=${CONFIG.goldRefreshInterval/1000}s`);
         });
 
         // Manual refresh on visibility change (mobile/tab switch)

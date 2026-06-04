@@ -1,3 +1,4 @@
+#tess12345
 import os
 from datetime import datetime
 from pyspark.sql import SparkSession
@@ -7,10 +8,23 @@ from pyspark.sql.functions import (
     row_number
 )
 from pyspark.sql.window import Window
+from delta import configure_spark_with_delta_pip
+from pyspark.sql import SparkSession
 
-spark = SparkSession.builder \
-    .appName("medallion-silver") \
-    .getOrCreate()
+builder = (
+    SparkSession.builder
+    .appName("medallion-bronze")
+    .config(
+        "spark.sql.extensions",
+        "io.delta.sql.DeltaSparkSessionExtension"
+    )
+    .config(
+        "spark.sql.catalog.spark_catalog",
+        "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    )
+)
+
+spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
 print("="*70)
 print(" SILVER LAYER: Data Cleaning & Transformation")
@@ -22,7 +36,7 @@ SILVER_PATH = f"{LAKEHOUSE_PATH}/silver"
 
 print("\n  Cleaning Weather API Data...")
 try:
-    df_weather = spark.read.format("parquet").load(f"{BRONZE_PATH}/weather_api")
+    df_weather = spark.read.format("delta").load(f"{BRONZE_PATH}/weather_api")
     print(f" Read {df_weather.count()} records from Bronze")
     
     df_weather_clean = df_weather \
@@ -46,7 +60,7 @@ try:
         .filter(col("row_num") == 1) \
         .drop("row_num")
     
-    df_weather_clean.write.format("parquet").mode("overwrite").save(f"{SILVER_PATH}/weather_api")
+    df_weather_clean.write.format("delta").mode("overwrite").save(f"{SILVER_PATH}/weather_api")
     print(f" Written {df_weather_clean.count()} cleaned weather records to Silver")
     
 except Exception as e:
@@ -54,7 +68,7 @@ except Exception as e:
 
 print("\n Cleaning News Data...")
 try:
-    df_news = spark.read.format("parquet").load(f"{BRONZE_PATH}/weather_rss")
+    df_news = spark.read.format("delta").load(f"{BRONZE_PATH}/weather_rss")
     print(f" Read {df_news.count()} records from Bronze")
     
     df_news_clean = df_news \
@@ -75,7 +89,7 @@ try:
         .filter(col("row_num") == 1) \
         .drop("row_num")
     
-    df_news_clean.write.format("parquet").mode("overwrite").save(f"{SILVER_PATH}/weather_rss")
+    df_news_clean.write.format("delta").mode("overwrite").save(f"{SILVER_PATH}/weather_rss")
     print(f" Written {df_news_clean.count()} cleaned news records to Silver")
     
 except Exception as e:
