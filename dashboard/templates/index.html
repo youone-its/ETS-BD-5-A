@@ -565,11 +565,11 @@
 
         function updateAnalysisSection() {
             // Update Analisis 1: Temperature Statistics
-            if (sparkResults.suhu_kota) {
+            if (sparkResults.suhu_per_kota) {
                 const tbody = document.getElementById('tempBody');
                 tbody.innerHTML = '';
-                
-                sparkResults.suhu_kota.forEach(row => {
+
+                sparkResults.suhu_per_kota.forEach(row => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${row.nama_kota}</td>
@@ -582,11 +582,11 @@
             }
 
             // Update Analisis 2: Extreme Events
-            if (sparkResults.ekstrem) {
+            if (sparkResults.kondisi_ekstrem) {
                 const tbody = document.getElementById('extremeBody');
                 tbody.innerHTML = '';
-                
-                sparkResults.ekstrem.forEach(row => {
+
+                sparkResults.kondisi_ekstrem.forEach(row => {
                     const tr = document.createElement('tr');
                     const category = row.jumlah_event_ekstrem > 5 ? 'Sangat Tinggi' : 
                                    row.jumlah_event_ekstrem > 2 ? 'Tinggi' : 'Sedang';

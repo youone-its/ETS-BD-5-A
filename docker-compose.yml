@@ -1,40 +1,10 @@
-version: '3.8'
-
 networks:
   weatherpulse:
     driver: bridge
 
 services:
-  kafka:
-    build:
-      context: ./kafka
-      dockerfile: Dockerfile
-    image: etsbd-kafka
-    container_name: kafka-broker
-    ports:
-      - "9092:9092"
-    networks:
-      - weatherpulse
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    healthcheck:
-      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
-      interval: 5s
-      timeout: 10s
-      retries: 10
-      start_period: 30s
+
+  # ── HADOOP ─────────────────────────────────────────────────────────────────
 
   namenode:
     build:
@@ -57,7 +27,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:9870"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   datanode:
     build:
@@ -65,6 +35,7 @@ services:
       dockerfile: Dockerfile
     image: etsbd-hadoop
     container_name: hadoop-datanode
+    hostname: hadoop-datanode
     networks:
       - weatherpulse
     depends_on:
@@ -108,6 +79,190 @@ services:
       - ./hadoop/hadoop.env
     command: ["yarn", "nodemanager"]
 
+  # ── KAFKA (KRaft) ───────────────────────────────────────────────────────────
+
+  kafka:
+    build:
+      context: ./kafka
+      dockerfile: Dockerfile
+    image: etsbd-kafka
+    container_name: kafka-broker
+    ports:
+      - "9092:9092"
+    networks:
+      - weatherpulse
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "5L6g3nShT-eMCtK--X86sw"
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ── DATA PIPELINE ───────────────────────────────────────────────────────────
+
+  producer-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    image: etsbd-pipeline
+    container_name: producer-api
+    networks:
+      - weatherpulse
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    command: python3 producer_api.py
+
+  producer-rss:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    image: etsbd-pipeline
+    container_name: producer-rss
+    networks:
+      - weatherpulse
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    command: python3 producer_rss.py
+
+  consumer-hdfs:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    image: etsbd-pipeline
+    container_name: consumer-hdfs
+    networks:
+      - weatherpulse
+    depends_on:
+      kafka:
+        condition: service_healthy
+      namenode:
+        condition: service_healthy
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    command: python3 consumer_to_hdfs.py
+
+  # ── MEDALLION PIPELINE ──────────────────────────────────────────────────────
+
+  medallion-bronze:
+    build:
+      context: ./medallion
+      dockerfile: Dockerfile
+    image: etsbd-spark-medallion
+    container_name: medallion-bronze
+    networks:
+      - weatherpulse
+    depends_on:
+      namenode:
+        condition: service_healthy
+      consumer-hdfs:
+        condition: service_started
+    volumes:
+      - ./medallion:/app
+      - ./medallion/lakehouse_data:/lakehouse
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - SPARK_LOCAL_IP=127.0.0.1
+      - PYTHONUNBUFFERED=1
+    command: python3 01_bronze.py
+
+  medallion-silver:
+    build:
+      context: ./medallion
+      dockerfile: Dockerfile
+    image: etsbd-spark-medallion
+    container_name: medallion-silver
+    networks:
+      - weatherpulse
+    depends_on:
+      medallion-bronze:
+        condition: service_completed_successfully
+    volumes:
+      - ./medallion:/app
+      - ./medallion/lakehouse_data:/lakehouse
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - SPARK_LOCAL_IP=127.0.0.1
+      - PYTHONUNBUFFERED=1
+    command: python3 02_silver.py
+
+  spark-analysis:
+    build:
+      context: ./medallion
+      dockerfile: Dockerfile
+    image: etsbd-spark-medallion
+    container_name: spark-analysis
+    networks:
+      - weatherpulse
+    depends_on:
+      medallion-silver:
+        condition: service_completed_successfully
+    volumes:
+      - ./medallion:/app
+      - ./medallion/lakehouse_data:/lakehouse
+      - ./dashboard/data:/app/dashboard/data
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - SPARK_LOCAL_IP=127.0.0.1
+      - PYTHONUNBUFFERED=1
+    command: python3 spark_analysis.py
+
+  medallion-gold:
+    build:
+      context: ./medallion
+      dockerfile: Dockerfile
+    image: etsbd-spark-medallion
+    container_name: medallion-gold
+    networks:
+      - weatherpulse
+    depends_on:
+      spark-analysis:
+        condition: service_completed_successfully
+    volumes:
+      - ./medallion:/app
+      - ./medallion/lakehouse_data:/lakehouse
+    environment:
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - SPARK_LOCAL_IP=127.0.0.1
+      - PYTHONUNBUFFERED=1
+    command: python3 03_gold.py
+
+  # ── DASHBOARD ───────────────────────────────────────────────────────────────
+
   dashboard:
     build:
       context: ./dashboard
@@ -137,172 +292,3 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  spark:
-    build:
-      context: ./medallion
-      dockerfile: Dockerfile
-    image: etsbd-spark-medallion
-    container_name: spark-medallion
-    networks:
-      - weatherpulse
-    depends_on:
-      namenode:
-        condition: service_healthy
-    volumes:
-      - ./medallion:/app
-      - ./medallion/lakehouse_data:/lakehouse
-    environment:
-      - HDFS_HOST=namenode
-      - HDFS_PORT=8020
-      - SPARK_LOCAL_IP=127.0.0.1
-    stdin_open: true
-    tty: true
-    command: /bin/bash
-
-  producer-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.pipeline
-    image: etsbd-producer-api
-    container_name: producer-api
-    networks:
-      - weatherpulse
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      - BOOTSTRAP_SERVERS=kafka:9092
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - .:/app
-    command: python3 producer_api.py
-
-  producer-rss:
-    build:
-      context: .
-      dockerfile: Dockerfile.pipeline
-    image: etsbd-producer-rss
-    container_name: producer-rss
-    networks:
-      - weatherpulse
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      - BOOTSTRAP_SERVERS=kafka:9092
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - .:/app
-    command: python3 producer_rss.py
-
-  consumer-hdfs:
-    build:
-      context: .
-      dockerfile: Dockerfile.pipeline
-    image: etsbd-consumer-hdfs
-    container_name: consumer-hdfs
-    networks:
-      - weatherpulse
-    depends_on:
-      kafka:
-        condition: service_healthy
-      namenode:
-        condition: service_healthy
-    environment:
-      - BOOTSTRAP_SERVERS=kafka:9092
-      - HDFS_HOST=namenode
-      - HDFS_PORT=8020
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - .:/app
-      - ./data:/data
-    command: python3 consumer_to_hdfs.py
-
-  medallion-bronze:
-    build:
-      context: ./medallion
-      dockerfile: Dockerfile
-    image: etsbd-spark-medallion
-    container_name: medallion-bronze
-    networks:
-      - weatherpulse
-    depends_on:
-      namenode:
-        condition: service_healthy
-    volumes:
-      - ./medallion:/app
-      - ./medallion/lakehouse_data:/lakehouse
-      - ./data:/data
-    environment:
-      - HDFS_HOST=namenode
-      - HDFS_PORT=8020
-      - SPARK_LOCAL_IP=127.0.0.1
-      - PYTHONUNBUFFERED=1
-    command: python3 01_bronze.py
-
-  medallion-silver:
-    build:
-      context: ./medallion
-      dockerfile: Dockerfile
-    image: etsbd-spark-medallion
-    container_name: medallion-silver
-    networks:
-      - weatherpulse
-    depends_on:
-      medallion-bronze:
-        condition: service_completed_successfully
-    volumes:
-      - ./medallion:/app
-      - ./medallion/lakehouse_data:/lakehouse
-    environment:
-      - HDFS_HOST=namenode
-      - HDFS_PORT=8020
-      - SPARK_LOCAL_IP=127.0.0.1
-      - PYTHONUNBUFFERED=1
-    command: python3 02_silver.py
-
-  medallion-gold:
-    build:
-      context: ./medallion
-      dockerfile: Dockerfile
-    image: etsbd-spark-medallion
-    container_name: medallion-gold
-    networks:
-      - weatherpulse
-    depends_on:
-      medallion-silver:
-        condition: service_completed_successfully
-    volumes:
-      - ./medallion:/app
-      - ./medallion/lakehouse_data:/lakehouse
-    environment:
-      - HDFS_HOST=namenode
-      - HDFS_PORT=8020
-      - SPARK_LOCAL_IP=127.0.0.1
-      - PYTHONUNBUFFERED=1
-    command: python3 03_gold.py
-
-  spark-analysis:
-    build:
-      context: ./medallion
-      dockerfile: Dockerfile
-    image: etsbd-spark-medallion
-    container_name: spark-analysis
-    networks:
-      - weatherpulse
-    depends_on:
-      medallion-gold:
-        condition: service_completed_successfully
-    volumes:
-      - ./medallion:/app
-      - ./medallion/lakehouse_data:/lakehouse
-      - .:/workspace
-      - ./dashboard/data:/workspace/dashboard/data
-    environment:
-      - HDFS_HOST=namenode
-      - HDFS_PORT=8020
-      - SPARK_LOCAL_IP=127.0.0.1
-      - PYTHONUNBUFFERED=1
-    working_dir: /workspace
-    command: python3 spark_analysis.py

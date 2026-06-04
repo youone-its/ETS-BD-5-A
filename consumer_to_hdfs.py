@@ -1,47 +1,46 @@
-"""
-Kafka Consumer → Local Storage (simulating HDFS).
-Karena Docker-in-Docker tidak tersedia, simpan ke local volume yang dimount.
-"""
-
-import os
 import json
 import threading
 import time
 from datetime import datetime
+
+import requests
 from kafka import KafkaConsumer
 
 from config import (
     BOOTSTRAP_SERVERS, TOPIC_API, TOPIC_RSS,
-    HDFS_API_PATH, HDFS_RSS_PATH, FLUSH_INTERVAL
+    HDFS_API_PATH, HDFS_RSS_PATH, FLUSH_INTERVAL,
+    HDFS_HOST
 )
 
-
-def create_local_directory(path: str):
-    """Pastikan direktori local sudah ada (simulating HDFS)."""
-    os.makedirs(path, exist_ok=True)
-    print(f"✅ {path} Siap.")
+WEBHDFS = f"http://{HDFS_HOST}:9870/webhdfs/v1"
+HDFS_USER = "hadoop"
 
 
-def save_to_local(data: list, local_path: str, label: str):
-    """Simpan data ke filesystem local (simulating HDFS)."""
-    if not data:
-        return
-
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"{local_path}/{label.lower()}_{ts}.json"
-
-    with open(filename, "w") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-    print(f"  [{label}] ✅ {filename} ({len(data)} event)")
+def hdfs_mkdir(path):
+    r = requests.put(f"{WEBHDFS}{path}?op=MKDIRS&user.name={HDFS_USER}")
+    r.raise_for_status()
+    print(f"{path} Siap.")
 
 
-def run_consumer(topic: str, local_path: str, label: str, stop_flag: threading.Event):
-    """Jalankan consumer untuk topic tertentu."""
-    max_retries = 10
-    retry_count = 0
+def hdfs_write(hdfs_path, filename, data):
+    content = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    url = f"{WEBHDFS}{hdfs_path}/{filename}?op=CREATE&overwrite=true&user.name={HDFS_USER}"
 
-    while retry_count < max_retries:
+    # Step 1: namenode returns 307 redirect ke datanode
+    r1 = requests.put(url, allow_redirects=False)
+    if r1.status_code != 307:
+        r1.raise_for_status()
+
+    datanode_url = r1.headers["Location"]
+
+    # Step 2: tulis content ke datanode
+    r2 = requests.put(datanode_url, data=content, headers={"Content-Type": "application/octet-stream"})
+    r2.raise_for_status()
+    print(f"  [{filename}] HDFS {hdfs_path} ({len(data)} record)")
+
+
+def run_consumer(topic, hdfs_path, label, stop_flag):
+    for attempt in range(1, 11):
         try:
             consumer = KafkaConsumer(
                 topic,
@@ -54,19 +53,18 @@ def run_consumer(topic: str, local_path: str, label: str, stop_flag: threading.E
             )
             break
         except Exception as e:
-            retry_count += 1
-            wait_time = 5 * retry_count
-            print(f"[Consumer {label}] Kafka belum siap, retry dalam {wait_time}s... ({retry_count}/{max_retries})")
-            time.sleep(wait_time)
-            if retry_count >= max_retries:
-                print(f"[Consumer {label}] Gagal connect ke Kafka setelah {max_retries} kali")
+            wait = 5 * attempt
+            print(f"[Consumer {label}] Kafka belum siap, retry {attempt}/10 dalam {wait}s")
+            time.sleep(wait)
+            if attempt >= 10:
+                print(f"[Consumer {label}] Gagal connect ke Kafka")
                 return
 
     buffer = []
     lock = threading.Lock()
+    last_flush = time.time()
 
     print(f"[Consumer {label}] Dimulai, topic: {topic}")
-    last_flush = time.time()
 
     while not stop_flag.is_set():
         try:
@@ -78,42 +76,54 @@ def run_consumer(topic: str, local_path: str, label: str, stop_flag: threading.E
 
             if time.time() - last_flush >= FLUSH_INTERVAL:
                 with lock:
-                    data_copy = buffer.copy()
+                    batch = buffer.copy()
                     buffer.clear()
-                save_to_local(data_copy, local_path, label)
+                if batch:
+                    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                    hdfs_write(hdfs_path, f"{label.lower()}_{ts}.json", batch)
                 last_flush = time.time()
+
         except Exception as e:
             print(f"[Consumer {label}] Error: {e}")
             time.sleep(5)
 
     with lock:
-        data_copy = buffer.copy()
+        batch = buffer.copy()
         buffer.clear()
-    save_to_local(data_copy, local_path, label)
+    if batch:
+        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        hdfs_write(hdfs_path, f"{label.lower()}_{ts}.json", batch)
 
     consumer.close()
     print(f"[Consumer {label}] Berhenti")
 
 
 if __name__ == "__main__":
-    # Create local directories (simulating HDFS)
-    os.makedirs("/data/weather/api", exist_ok=True)
-    os.makedirs("/data/weather/rss", exist_ok=True)
+    # tunggu namenode WebHDFS siap
+    for attempt in range(1, 13):
+        try:
+            r = requests.get(f"{WEBHDFS}/?op=LISTSTATUS&user.name={HDFS_USER}", timeout=5)
+            if r.status_code in (200, 404):
+                break
+        except Exception:
+            pass
+        print(f"Menunggu HDFS WebHDFS siap... ({attempt}/12)")
+        time.sleep(10)
 
-    create_local_directory("/data/weather/api")
-    create_local_directory("/data/weather/rss")
+    hdfs_mkdir(HDFS_API_PATH)
+    hdfs_mkdir(HDFS_RSS_PATH)
 
     stop_flag = threading.Event()
 
     thread_api = threading.Thread(
         target=run_consumer,
-        args=(TOPIC_API, "/data/weather/api", "API", stop_flag),
-        daemon=False
+        args=(TOPIC_API, HDFS_API_PATH, "API", stop_flag),
+        daemon=False,
     )
     thread_rss = threading.Thread(
         target=run_consumer,
-        args=(TOPIC_RSS, "/data/weather/rss", "RSS", stop_flag),
-        daemon=False
+        args=(TOPIC_RSS, HDFS_RSS_PATH, "RSS", stop_flag),
+        daemon=False,
     )
 
     thread_api.start()

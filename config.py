@@ -23,8 +23,8 @@ RSS_URLS = [
 TOPIC_API = "weather-api"
 TOPIC_RSS = "weather-rss"
 
-INTERVAL_API = 600   # 10 menit
-INTERVAL_RSS = 300   # 5 menit
+INTERVAL_API = 60   # poll tiap 60 detik
+INTERVAL_RSS = 60   # poll tiap 60 detik
 
 HDFS_HOST = os.getenv("HDFS_HOST", "localhost")
 HDFS_PORT = os.getenv("HDFS_PORT", "8020")
@@ -33,4 +33,4 @@ HDFS_URI = f"hdfs://{HDFS_HOST}:{HDFS_PORT}"
 HDFS_API_PATH = "/data/weather/api"
 HDFS_RSS_PATH = "/data/weather/rss"
 
-FLUSH_INTERVAL = 120   # flush ke HDFS tiap 2 menit
+FLUSH_INTERVAL = 30

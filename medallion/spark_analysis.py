@@ -1,157 +1,141 @@
-"""
-Spark Analysis - Analisis data cuaca dari HDFS.
-Melakukan 3 analisis:
-1. Statistik suhu per kota
-2. Deteksi kondisi ekstrem
-3. Tren suhu per jam
-"""
-
 import os
 import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    hour, avg, max, min, col, count, to_timestamp, round as spark_round
+    hour, avg, max, min, col, count, round as spark_round
 )
 
-from config import HDFS_URI, HDFS_API_PATH
+
+LAKEHOUSE_PATH = "/lakehouse"
+SILVER_PATH = f"{LAKEHOUSE_PATH}/silver"
+# GoldPath = f"{LAKEHOUSE_PATH}/gold"
+
+
+def build_spark():
+    return SparkSession.builder \
+        .appName("WeatherPulseAnalysis") \
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+        .getOrCreate()
+
+
+class WeatherAnalysis:
+    def __init__(self, spark):
+        self.spark = spark
+        self.df = spark.read.format("delta").load(f"{SILVER_PATH}/weather_api")
+        self.df.createOrReplaceTempView("weather_api")
+
+    def suhu_per_kota(self):
+        return (
+            self.df.groupBy("kode_kota", "nama_kota")
+            .agg(
+                spark_round(avg("temperature"), 2).alias("suhu_avg"),
+                max("temperature").alias("suhu_tertinggi"),
+                min("temperature").alias("suhu_terendah"),
+                count("*").alias("jumlah_event"),
+            )
+            .orderBy(col("suhu_avg").desc())
+        )
+
+    def kondisi_ekstrem(self):
+        return (
+            self.df.filter(
+                (col("wind_speed") > 40) | (col("humidity") > 90) | (col("temperature") > 35)
+            )
+            .groupBy("kode_kota", "nama_kota")
+            .agg(count("*").alias("jumlah_event_ekstrem"))
+            .orderBy(col("jumlah_event_ekstrem").desc())
+        )
+
+    def tren_jam(self):
+        return self.spark.sql("""
+            SELECT
+                HOUR(timestamp) AS jam,
+                ROUND(AVG(temperature), 2) AS suhu_avg,
+                COUNT(*) AS jumlah_event
+            FROM weather_api
+            WHERE timestamp IS NOT NULL
+            GROUP BY HOUR(timestamp)
+            ORDER BY jam
+        """)
+
+
+class NewsAnalysis:
+    def __init__(self, spark):
+        self.spark = spark
+        self.df = spark.read.format("delta").load(f"{SILVER_PATH}/weather_rss")
+
+
+def build_narasi(suhu_df, ekstrem_df, tren_df):
+    top_suhu = suhu_df.first()
+    narasi_suhu = (
+        f"{top_suhu['nama_kota']} memiliki rata-rata suhu tertinggi "
+        f"({top_suhu['suhu_avg']} C). Kota ini perlu diprioritaskan untuk "
+        "monitoring pengiriman pada jam panas."
+    ) if top_suhu else "Data suhu belum tersedia."
+
+    top_ekstrem = ekstrem_df.first()
+    narasi_ekstrem = (
+        f"{top_ekstrem['nama_kota']} paling sering mengalami kondisi ekstrem "
+        f"({top_ekstrem['jumlah_event_ekstrem']} event). Rute melalui kota ini "
+        "perlu dicek ulang sebelum pengiriman."
+    ) if top_ekstrem else (
+        "Tidak ada event ekstrem (wind_speed > 40, humidity > 90, temperature > 35). "
+        "Kondisi relatif aman."
+    )
+
+    jam_terdingin = tren_df.orderBy(col("suhu_avg").asc()).first()
+    narasi_tren = (
+        f"Jam {jam_terdingin['jam']:02d}:00 memiliki rata-rata suhu terendah "
+        f"({jam_terdingin['suhu_avg']} C). Waktu ini dapat dipertimbangkan "
+        "sebagai waktu pengiriman yang lebih nyaman."
+    ) if jam_terdingin else "Data timestamp belum cukup untuk membaca tren suhu per jam."
+
+    return narasi_suhu, narasi_ekstrem, narasi_tren
 
 
 def main():
-    os.environ["HADOOP_USER_NAME"] = "hadoop"
-
-    spark = SparkSession.builder \
-        .appName("WeatherPulseAnalysis") \
-        .config("spark.hadoop.fs.defaultFS", HDFS_URI) \
-        .getOrCreate()
+    spark = build_spark()
 
     print("="*70)
-    print("📊 ANALISIS DATA CUACA - SPARK")
+    print("SPARK ANALYSIS - baca dari Silver Delta")
     print("="*70)
 
-    df_api = spark.read.json(f"{HDFS_URI}{HDFS_API_PATH}/")
-    df_api = df_api.withColumn("ts_obj", to_timestamp(col("timestamp")))
-    df_api.createOrReplaceTempView("weather_api")
+    weather = WeatherAnalysis(spark)
+    news = NewsAnalysis(spark)
 
-    total_event = df_api.count()
-    print(f"\nTotal event cuaca terbaca dari HDFS: {total_event}")
+    total_event = weather.df.count()
+    print(f"Total event cuaca dari Silver: {total_event}")
 
-    # ========== ANALISIS 1: Statistik Suhu Per Kota ==========
-    print("\n" + "="*70)
-    print("ANALISIS 1 - Statistik Suhu Per Kota")
-    print("="*70)
+    suhu_df = weather.suhu_per_kota()
+    ekstrem_df = weather.kondisi_ekstrem()
+    tren_df = weather.tren_jam()
 
-    suhu_per_kota = (
-        df_api.groupBy("kode_kota", "nama_kota")
-        .agg(
-            spark_round(avg("temperature"), 2).alias("suhu_avg"),
-            max("temperature").alias("suhu_tertinggi"),
-            min("temperature").alias("suhu_terendah"),
-            count("*").alias("jumlah_event"),
-        )
-        .orderBy(col("suhu_avg").desc())
-    )
-
-    suhu_per_kota.show(truncate=False)
-
-    top_suhu = suhu_per_kota.first()
-    if top_suhu:
-        narasi_suhu = (
-            f"{top_suhu['nama_kota']} memiliki rata-rata suhu tertinggi "
-            f"({top_suhu['suhu_avg']} °C). Kota ini perlu diprioritaskan untuk "
-            "monitoring pengiriman pada jam panas."
-        )
-    else:
-        narasi_suhu = "Data suhu belum tersedia untuk dianalisis."
-
-    print(f"\n📝 Interpretasi: {narasi_suhu}")
-
-    # ========== ANALISIS 2: Deteksi Kondisi Ekstrem ==========
-    print("\n" + "="*70)
-    print("ANALISIS 2 - Deteksi Kondisi Cuaca Ekstrem")
-    print("="*70)
-
-    kondisi_ekstrem = df_api.filter(
+    total_ekstrem = weather.df.filter(
         (col("wind_speed") > 40) | (col("humidity") > 90) | (col("temperature") > 35)
-    )
+    ).count()
 
-    rekap_ekstrem = (
-        kondisi_ekstrem.groupBy("kode_kota", "nama_kota")
-        .agg(count("*").alias("jumlah_event_ekstrem"))
-        .orderBy(col("jumlah_event_ekstrem").desc())
-    )
+    print("\nAnalisis 1 - Statistik Suhu Per Kota")
+    suhu_df.show(truncate=False)
 
-    total_ekstrem = kondisi_ekstrem.count()
-    rekap_ekstrem.show(truncate=False)
-    print(f"\nTotal event cuaca ekstrem: {total_ekstrem}")
+    print("\nAnalisis 2 - Deteksi Kondisi Ekstrem")
+    ekstrem_df.show(truncate=False)
+    print(f"Total event ekstrem: {total_ekstrem}")
 
-    top_ekstrem = rekap_ekstrem.first()
-    if top_ekstrem:
-        narasi_ekstrem = (
-            f"{top_ekstrem['nama_kota']} paling sering mengalami kondisi ekstrem "
-            f"({top_ekstrem['jumlah_event_ekstrem']} event). Rute melalui kota ini "
-            "perlu dicek ulang sebelum pengiriman."
-        )
-    else:
-        narasi_ekstrem = (
-            "Tidak ada event ekstrem berdasarkan ambang wind_speed > 40 km/h, "
-            "humidity > 90%, atau temperature > 35°C. Kondisi relatif aman pada "
-            "data yang terkumpul."
-        )
+    print("\nAnalisis 3 - Tren Suhu Per Jam")
+    tren_df.show(24, truncate=False)
 
-    print(f"\n📝 Interpretasi: {narasi_ekstrem}")
-
-    # ========== ANALISIS 3: Tren Suhu Per Jam ==========
-    print("\n" + "="*70)
-    print("ANALISIS 3 - Tren Suhu Rata-Rata Per Jam")
-    print("="*70)
-
-    tren_jam = spark.sql(
-        """
-        SELECT
-            HOUR(ts_obj) AS jam,
-            ROUND(AVG(temperature), 2) AS suhu_avg,
-            COUNT(*) AS jumlah_event
-        FROM weather_api
-        WHERE ts_obj IS NOT NULL
-        GROUP BY HOUR(ts_obj)
-        ORDER BY jam
-        """
-    )
-
-    tren_jam.show(24, truncate=False)
-
-    jam_terdingin = tren_jam.orderBy(col("suhu_avg").asc()).first()
-    if jam_terdingin:
-        narasi_tren = (
-            f"Jam {jam_terdingin['jam']:02d}:00 memiliki rata-rata suhu terendah "
-            f"({jam_terdingin['suhu_avg']}°C). Waktu ini dapat dipertimbangkan "
-            "sebagai waktu pengiriman yang lebih nyaman."
-        )
-    else:
-        narasi_tren = "Data timestamp belum cukup untuk membaca tren suhu per jam."
-
-    print(f"\n📝 Interpretasi: {narasi_tren}")
-
-    # ========== SIMPAN HASIL ANALISIS ==========
-    print("\n" + "="*70)
-    print("💾 MENYIMPAN HASIL ANALISIS")
-    print("="*70)
-
-    hdfs_output = f"{HDFS_URI}/data/weather/hasil"
-
-    suhu_per_kota.write.mode("overwrite").json(f"{hdfs_output}/suhu_per_kota")
-    rekap_ekstrem.write.mode("overwrite").json(f"{hdfs_output}/kondisi_ekstrem")
-    tren_jam.write.mode("overwrite").json(f"{hdfs_output}/tren_jam")
-
-    print(f"✅ Hasil analisis tersimpan di {hdfs_output}/")
+    narasi_suhu, narasi_ekstrem, narasi_tren = build_narasi(suhu_df, ekstrem_df, tren_df)
+    print(f"\nInterpretasi suhu  : {narasi_suhu}")
+    print(f"Interpretasi ekstrem: {narasi_ekstrem}")
+    print(f"Interpretasi tren  : {narasi_tren}")
 
     os.makedirs("dashboard/data", exist_ok=True)
 
     spark_results = {
         "metadata": {
             "topik": "WeatherPulse",
-            "hdfs_input": f"{HDFS_URI}{HDFS_API_PATH}/",
-            "hdfs_output": hdfs_output,
+            "silver_input": f"{SILVER_PATH}/weather_api",
             "total_event": total_event,
             "total_event_ekstrem": total_ekstrem,
         },
@@ -160,16 +144,16 @@ def main():
             "kondisi_ekstrem": narasi_ekstrem,
             "tren_jam": narasi_tren,
         },
-        "suhu_per_kota": suhu_per_kota.toPandas().to_dict(orient="records"),
-        "kondisi_ekstrem": rekap_ekstrem.toPandas().to_dict(orient="records"),
-        "tren_jam": tren_jam.toPandas().to_dict(orient="records"),
+        "suhu_per_kota": suhu_df.toPandas().to_dict(orient="records"),
+        "kondisi_ekstrem": ekstrem_df.toPandas().to_dict(orient="records"),
+        "tren_jam": tren_df.toPandas().to_dict(orient="records"),
     }
 
     with open("dashboard/data/spark_results.json", "w", encoding="utf-8") as f:
         json.dump(spark_results, f, indent=2, ensure_ascii=False)
 
-    print("✅ dashboard/data/spark_results.json berhasil dibuat")
-    print("="*70 + "\n")
+    print("\ndashboard/data/spark_results.json berhasil dibuat")
+    print("="*70)
 
     spark.stop()
 

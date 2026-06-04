@@ -1,5 +1,5 @@
 # Dashboard with Spark integration
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
@@ -17,6 +17,13 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
+
+# Delta Lake JARs supaya dashboard bisa baca Gold Delta tables
+RUN PYSPARK_JARS=$(python3 -c "import pyspark, os; print(os.path.join(os.path.dirname(pyspark.__file__), 'jars'))") && \
+    curl -fsSL https://repo1.maven.org/maven2/io/delta/delta-spark_2.12/3.1.0/delta-spark_2.12-3.1.0.jar \
+        -o "$PYSPARK_JARS/delta-spark_2.12-3.1.0.jar" && \
+    curl -fsSL https://repo1.maven.org/maven2/io/delta/delta-storage/3.1.0/delta-storage-3.1.0.jar \
+        -o "$PYSPARK_JARS/delta-storage-3.1.0.jar"
 
 # Copy application code
 COPY . .

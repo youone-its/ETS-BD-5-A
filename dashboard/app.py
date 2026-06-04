@@ -13,6 +13,7 @@ Features:
 import json
 import os
 import sys
+import time
 from datetime import datetime, timedelta
 from threading import Thread
 from collections import deque, defaultdict
@@ -32,7 +33,7 @@ except ImportError:
 # CONFIGURATION
 # ============================================================================
 
-KAFKA_BOOTSTRAP_SERVERS = ["localhost:9092"]
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("BOOTSTRAP_SERVERS", "localhost:9092").split(",")
 KAFKA_TIMEOUT_MS = 5000
 
 # Path untuk Spark results
@@ -96,68 +97,56 @@ def consume_weather_api():
     Background thread: Consumer untuk topic 'weather-api'
     Update latest_weather dengan data terbaru per kota
     """
-    try:
-        consumer = KafkaConsumer(
-            'weather-api',
-            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            auto_offset_reset='earliest',
-            consumer_timeout_ms=KAFKA_TIMEOUT_MS,
-            group_id='dashboard-api-consumer-v2'
-        )
-        
-        print("[Dashboard] 🌡️ Weather API Consumer started...")
-        
-        for message in consumer:
-            data = message.value
-            kode_kota = data.get('kode_kota')
-            
-            if kode_kota:
-                # Update latest reading
-                latest_weather[kode_kota] = data
-                
-                # Keep history
-                weather_history[kode_kota].append(data)
-                
-                print(f"[Dashboard] Updated {kode_kota}: {data['temperature']}°C, "
-                      f"humidity: {data['humidity']}%, wind: {data['wind_speed']} km/h")
-    
-    except KafkaError as e:
-        print(f"[Dashboard] ❌ Kafka error in weather consumer: {e}")
-    except Exception as e:
-        print(f"[Dashboard] ❌ Error in weather consumer: {e}")
-    finally:
-        consumer.close()
+    while True:
+        try:
+            consumer = KafkaConsumer(
+                'weather-api',
+                bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+                value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+                auto_offset_reset='earliest',
+                group_id=None  # tanpa commit offset: selalu replay dari awal tiap restart
+            )
+
+            print("[Dashboard] Weather API Consumer started...")
+
+            for message in consumer:
+                data = message.value
+                kode_kota = data.get('kode_kota')
+
+                if kode_kota:
+                    latest_weather[kode_kota] = data
+                    weather_history[kode_kota].append(data)
+                    print(f"[Dashboard] Updated {kode_kota}: {data['temperature']}C")
+
+        except Exception as e:
+            print(f"[Dashboard] Error in weather consumer: {e}, reconnect dalam 10s")
+            time.sleep(10)
 
 def consume_weather_rss():
     """
     Background thread: Consumer untuk topic 'weather-rss'
     Update latest_news dengan artikel terbaru
     """
-    try:
-        consumer = KafkaConsumer(
-            'weather-rss',
-            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-            auto_offset_reset='earliest',
-            consumer_timeout_ms=KAFKA_TIMEOUT_MS,
-            group_id='dashboard-rss-consumer-baru-banget'
-        )
-        
-        print("[Dashboard] 📰 Weather RSS Consumer started...")
-        
-        for message in consumer:
-            artikel = message.value
-            latest_news.appendleft(artikel)  # Newest first
-            
-            print(f"[Dashboard] New article: {artikel['judul'][:50]}...")
-    
-    except KafkaError as e:
-        print(f"[Dashboard] ❌ Kafka error in RSS consumer: {e}")
-    except Exception as e:
-        print(f"[Dashboard] ❌ Error in RSS consumer: {e}")
-    finally:
-        consumer.close()
+    while True:
+        try:
+            consumer = KafkaConsumer(
+                'weather-rss',
+                bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+                value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+                auto_offset_reset='earliest',
+                group_id=None  # tanpa commit offset: selalu replay dari awal tiap restart
+            )
+
+            print("[Dashboard] Weather RSS Consumer started...")
+
+            for message in consumer:
+                artikel = message.value
+                latest_news.appendleft(artikel)
+                print(f"[Dashboard] New article: {artikel['judul'][:50]}...")
+
+        except Exception as e:
+            print(f"[Dashboard] Error in RSS consumer: {e}, reconnect dalam 10s")
+            time.sleep(10)
 
 # ============================================================================
 # HELPER FUNCTIONS
