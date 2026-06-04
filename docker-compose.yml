@@ -121,8 +121,24 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      medallion-gold:
+        condition: service_completed_successfully
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - HDFS_HOST=namenode
+      - HDFS_PORT=8020
+      - LAKEHOUSE_PATH=/lakehouse
+      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=production
     volumes:
       - ./dashboard/data:/app/data
+      - ./medallion/lakehouse_data:/lakehouse
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   spark:
     build:
