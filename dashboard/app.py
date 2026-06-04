@@ -239,7 +239,7 @@ def load_spark_results():
 
 def read_gold_table(table_name):
     """
-    Baca Delta table dari Gold layer
+    Baca table dari Gold layer (Parquet format)
     Returns DataFrame atau None jika error
     """
     if not spark_session:
@@ -248,7 +248,11 @@ def read_gold_table(table_name):
     try:
         table_path = f"{GOLD_PATH}/{table_name}"
         if os.path.exists(table_path):
-            df = spark_session.read.format("delta").load(table_path)
+            # Try Parquet first (current format), fallback to Delta if available
+            try:
+                df = spark_session.read.format("parquet").load(table_path)
+            except:
+                df = spark_session.read.format("delta").load(table_path)
             return df
     except Exception as e:
         print(f"[Dashboard] ⚠️ Error reading Gold table {table_name}: {e}")
