@@ -32,4 +32,4 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["python3", "app.py"]

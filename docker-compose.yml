@@ -178,7 +178,7 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - .:/app
-    command: python producer_api.py
+    command: python3 producer_api.py
 
   producer-rss:
     build:
@@ -196,7 +196,7 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - .:/app
-    command: python producer_rss.py
+    command: python3 producer_rss.py
 
   consumer-hdfs:
     build:
@@ -219,7 +219,7 @@ services:
     volumes:
       - .:/app
       - ./data:/data
-    command: python consumer_to_hdfs.py
+    command: python3 consumer_to_hdfs.py
 
   medallion-bronze:
     build:
@@ -241,7 +241,7 @@ services:
       - HDFS_PORT=8020
       - SPARK_LOCAL_IP=127.0.0.1
       - PYTHONUNBUFFERED=1
-    command: python 01_bronze.py
+    command: python3 01_bronze.py
 
   medallion-silver:
     build:
@@ -262,7 +262,7 @@ services:
       - HDFS_PORT=8020
       - SPARK_LOCAL_IP=127.0.0.1
       - PYTHONUNBUFFERED=1
-    command: python 02_silver.py
+    command: python3 02_silver.py
 
   medallion-gold:
     build:
@@ -283,7 +283,7 @@ services:
       - HDFS_PORT=8020
       - SPARK_LOCAL_IP=127.0.0.1
       - PYTHONUNBUFFERED=1
-    command: python 03_gold.py
+    command: python3 03_gold.py
 
   spark-analysis:
     build:
@@ -307,4 +307,4 @@ services:
       - SPARK_LOCAL_IP=127.0.0.1
       - PYTHONUNBUFFERED=1
     working_dir: /workspace
-    command: python spark_analysis.py
+    command: python3 spark_analysis.py
