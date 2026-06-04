@@ -7,8 +7,6 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType, I
 
 spark = SparkSession.builder \
     .appName("medallion-bronze") \
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
     .getOrCreate()
 
 print("="*70)
